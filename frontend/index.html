@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>HighTechNour Attendance</title>
+
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0b1220" />
+
+<!-- iOS PWA support -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="HTN Attendance" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<!-- Splash / boot screen -->
+<div id="boot-screen" class="boot-screen">
+  <div class="boot-logo">HighTechNour</div>
+  <div class="boot-ring"></div>
+  <div class="boot-sub">ATTENDANCE</div>
+</div>
+
+<!-- Login screen -->
+<div id="login-screen" class="screen hidden">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <h1>HighTechNour</h1>
+      <p class="brand-sub">Site Attendance</p>
+    </div>
+    <form id="login-form">
+      <label>Username
+        <input type="text" id="login-username" autocomplete="username" required />
+      </label>
+      <label>Password
+        <input type="password" id="login-password" autocomplete="current-password" required />
+      </label>
+      <button type="submit" id="login-button">Sign In</button>
+      <p id="login-error" class="error-text hidden"></p>
+    </form>
+  </div>
+</div>
+
+<!-- Employee app screen -->
+<div id="app-screen" class="screen hidden">
+  <header class="topbar">
+    <div class="topbar-title">HighTechNour</div>
+    <div class="topbar-user">
+      <span id="user-name"></span>
+      <button id="logout-button" class="icon-button" title="Sign out">⏻</button>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <div id="device-pending-banner" class="banner banner-warning hidden">
+      Your device is awaiting admin approval. You can't check in until it's approved.
+    </div>
+
+    <div id="assignment-banner" class="banner banner-assignment hidden"></div>
+
+    <div class="radar-wrap">
+      <svg id="radar" viewBox="0 0 220 220" class="radar-svg">
+        <circle cx="110" cy="110" r="95" class="radar-ring radar-ring-outer"></circle>
+        <circle cx="110" cy="110" r="65" class="radar-ring radar-ring-mid"></circle>
+        <circle cx="110" cy="110" r="35" class="radar-ring radar-ring-inner"></circle>
+        <circle id="radar-pulse" cx="110" cy="110" r="35" class="radar-pulse"></circle>
+        <circle cx="110" cy="110" r="8" class="radar-pin"></circle>
+      </svg>
+      <div id="status-pill" class="status-pill status-idle">Locating…</div>
+    </div>
+
+    <div class="site-select-wrap">
+      <label for="site-select">Site</label>
+      <select id="site-select"></select>
+    </div>
+
+    <button id="checkin-button" class="primary-button" disabled>Check In</button>
+
+    <section class="history">
+      <h2>Recent Activity</h2>
+      <ul id="history-list" class="history-list"></ul>
+    </section>
+  </main>
+</div>
+
+<!-- Admin dashboard screen -->
+<div id="admin-screen" class="screen hidden">
+  <header class="topbar">
+    <div class="topbar-title">HighTechNour · Admin</div>
+    <div class="topbar-user">
+      <span id="admin-user-name"></span>
+      <button id="admin-logout-button" class="icon-button" title="Sign out">⏻</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-button active" data-tab="flagged">Review Queue</button>
+    <button class="tab-button" data-tab="team">Team</button>
+    <button class="tab-button" data-tab="assignments">Assignments</button>
+    <button class="tab-button" data-tab="sites">Sites</button>
+    <button class="tab-button" data-tab="export">Export</button>
+  </nav>
+
+  <main class="main-content">
+    <section id="tab-flagged" class="tab-panel">
+      <h2>Flagged Check-ins</h2>
+      <ul id="flagged-list" class="admin-list"></ul>
+    </section>
+
+    <section id="tab-team" class="tab-panel hidden">
+      <h2>Team</h2>
+      <button id="add-user-button" class="secondary-button">+ Add Worker</button>
+      <ul id="team-list" class="admin-list"></ul>
+    </section>
+
+    <section id="tab-assignments" class="tab-panel hidden">
+      <h2>Assignments</h2>
+      <label>Date <input type="date" id="assignments-date" /></label>
+      <button id="add-assignment-button" class="secondary-button">+ Assign Worker</button>
+      <ul id="assignments-list" class="admin-list"></ul>
+    </section>
+
+    <section id="tab-sites" class="tab-panel hidden">
+      <h2>Sites</h2>
+      <button id="add-site-button" class="secondary-button">+ Add Site</button>
+      <ul id="sites-list" class="admin-list"></ul>
+    </section>
+
+    <section id="tab-export" class="tab-panel hidden">
+      <h2>Export Report</h2>
+      <label>Start Date <input type="date" id="export-start" /></label>
+      <label>End Date <input type="date" id="export-end" /></label>
+      <button id="export-button" class="primary-button">Download CSV</button>
+    </section>
+  </main>
+</div>
+
+<!-- Simple modal used for add-user / add-site forms -->
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button id="modal-cancel" class="secondary-button">Cancel</button>
+      <button id="modal-confirm" class="primary-button">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+  // Point this at your deployed backend before going live, e.g.
+  // window.HTN_API_BASE_URL = "https://your-backend.onrender.com/api";
+  window.HTN_API_BASE_URL = "http://localhost:4000/api";
+</script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+const express = require("express");
+const bcrypt = require("bcrypt");
+const pool = require("../db");
+const { requireAuth, requireAdmin } = require("../middleware/auth");
+const { isNonEmptyString } = require("../utils/validate");
+
+const router = express.Router();
+
+// Admin: list all employees/admins.
+router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, username, full_name, phone, role, active,
+              device_id IS NOT NULL AS device_approved,
+              pending_device_id IS NOT NULL AND device_id IS NULL AS device_pending,
+              device_bound_at, created_at
+       FROM users ORDER BY full_name`
+    );
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Admin: create a new worker account.
+router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { username, password, fullName, phone, role } = req.body;
+    if (!isNonEmptyString(username) || !isNonEmptyString(password, 100) || !isNonEmptyString(fullName)) {
+      return res.status(400).json({ error: "username, password, and fullName are required." });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters." });
+    }
+    const finalRole = role === "admin" ? "admin" : "employee";
+
+    const existing = await pool.query("SELECT id FROM users WHERE username = $1", [username.trim()]);
+    if (existing.rows[0]) {
+      return res.status(409).json({ error: "That username is already taken." });
+    }
+
+    const hash = await bcrypt.hash(password, 12);
+    const { rows } = await pool.query(
+      `INSERT INTO users (username, password_hash, full_name, phone, role)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, username, full_name, phone, role, active, created_at`,
+      [username.trim(), hash, fullName.trim(), phone || null, finalRole]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Admin: update a worker's basic info / active status.
+router.patch("/:id", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { fullName, phone, active, role } = req.body;
+    const { rows } = await pool.query(
+      `UPDATE users SET
+         full_name = COALESCE($1, full_name),
+         phone = COALESCE($2, phone),
+         active = COALESCE($3, active),
+         role = COALESCE($4, role)
+       WHERE id = $5
+       RETURNING id, username, full_name, phone, role, active`,
+      [fullName || null, phone || null, active === undefined ? null : !!active, role || null, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "User not found." });
+    res.json(rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Admin: approve a device that's pending (first-time binding, done in
+// person or over a call so the admin actually confirms it's the real
+// employee's phone - closes the "attacker binds first" race condition).
+router.post("/:id/approve-device", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE users SET device_id = pending_device_id, pending_device_id = NULL, device_bound_at = now()
+       WHERE id = $1 AND pending_device_id IS NOT NULL
+       RETURNING id, username, device_id, device_bound_at`,
+      [req.params.id]
+    );
+    if (!rows[0]) {
+      return res.status(400).json({ error: "No pending device to approve for this user." });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Admin: reset a worker's bound device (lost/replaced phone). Clears both
+// the approved and pending device so they register fresh on next check-in.
+router.post("/:id/reset-device", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE users SET device_id = NULL, pending_device_id = NULL, device_bound_at = NULL
+       WHERE id = $1
+       RETURNING id, username`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "User not found." });
+    res.json({ message: `Device binding cleared for ${rows[0].username}.` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Admin: force-logout a worker on every device (lost/stolen phone). Bumps
+// token_version so their existing token is rejected on their very next
+// request - no need to wait a year for it to expire naturally, and no need
+// to disable the whole account just to kill one bad session.
+router.post("/:id/force-logout", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      "UPDATE users SET token_version = token_version + 1 WHERE id = $1 RETURNING id, username",
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "User not found." });
+    res.json({ message: `${rows[0].username} has been signed out on all devices.` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Admin: reset a worker's password (they forgot it / it was compromised).
+router.post("/:id/reset-password", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { newPassword } = req.body;
+    if (!isNonEmptyString(newPassword, 100) || newPassword.length < 8) {
+      return res.status(400).json({ error: "newPassword must be at least 8 characters." });
+    }
+    const hash = await bcrypt.hash(newPassword, 12);
+    const { rows } = await pool.query(
+      "UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id, username",
+      [hash, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "User not found." });
+    res.json({ message: `Password reset for ${rows[0].username}.` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+module.exports = router;
