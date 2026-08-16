@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # HighTechNour Attendance
 
 Geofenced check-in/check-out system for HighTechNour Technologies —
