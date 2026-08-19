@@ -23,6 +23,10 @@ const state = {
   currentPosition: null, // { lat, lng, accuracy }
   distanceToSite: null,
   isCheckedIn: false,
+  map: null,
+  workerMarker: null,
+  siteMarker: null,
+  geofenceCircle: null,
 };
 
 // ---- Boot ----
@@ -40,19 +44,62 @@ window.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  await bootWithRetry();
+});
+
+// A slept/cold-starting backend (Railway "Serverless", or a sleeping Neon
+// DB) can make the very first request after idle time fail or hang for
+// 20-50s. That is NOT the same thing as "not logged in" - a valid token
+// should never be treated as invalid just because the server was briefly
+// unreachable. Retry a few times with backoff before giving up, and only
+// fall back to the login screen if the token is genuinely rejected (401 -
+// Api.me() throws) or every retry truly fails.
+async function bootWithRetry(attempt = 1) {
+  const maxAttempts = 4;
   try {
     const me = await Api.me();
     document.getElementById("boot-screen").classList.add("hidden");
+    hideReconnectBanner();
     if (me.role === "admin") {
       await enterAdmin(me);
     } else {
       await enterApp(me);
     }
-  } catch {
-    document.getElementById("boot-screen").classList.add("hidden");
-    showScreen("login-screen");
+  } catch (err) {
+    // A real auth failure (bad/expired token, disabled account) already
+    // triggers Auth.logout() + reload inside apiRequest's 401 branch -
+    // if we get here with a token still in storage, this was a network/
+    // server-availability failure, not a login failure.
+    if (!Auth.getToken()) {
+      document.getElementById("boot-screen").classList.add("hidden");
+      showScreen("login-screen");
+      return;
+    }
+    if (attempt >= maxAttempts) {
+      document.getElementById("boot-screen").classList.add("hidden");
+      showReconnectBanner("Can't reach the server. Check your connection and reopen the app.");
+      return;
+    }
+    showReconnectBanner(`Connecting to server… (attempt ${attempt}/${maxAttempts - 1})`);
+    setTimeout(() => bootWithRetry(attempt + 1), attempt * 1500);
   }
-});
+}
+
+function showReconnectBanner(message) {
+  let banner = document.getElementById("reconnect-banner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "reconnect-banner";
+    banner.className = "reconnect-banner";
+    document.body.prepend(banner);
+  }
+  banner.textContent = message;
+  banner.classList.remove("hidden");
+}
+
+function hideReconnectBanner() {
+  document.getElementById("reconnect-banner")?.classList.add("hidden");
+}
 
 // ---- Login ----
 document.getElementById("login-form").addEventListener("submit", async (e) => {
@@ -100,10 +147,88 @@ async function enterApp(user) {
     }
   } catch {}
 
+  initMap();
   await loadSites();
   await loadTodayAssignment();
   await loadHistory();
   startLocationWatch();
+}
+
+// ---- Live map ----
+// Free dark-styled tiles (CARTO "dark_all", no API key required) so the map
+// matches the navy/amber theme instead of looking like a default light map.
+function initMap() {
+  if (state.map) return; // already initialized (e.g. re-entering app screen)
+
+  state.map = L.map("site-map", {
+    zoomControl: true,
+    attributionControl: true,
+  }).setView([30.0561, 31.3395], 14); // Nasr City, Cairo default until we have a fix
+
+  L.tileLayer(
+    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      maxZoom: 19,
+      subdomains: "abcd",
+    }
+  ).addTo(state.map);
+
+  const workerIcon = L.divIcon({
+    className: "",
+    html: '<div class="worker-marker"><div class="pulse"></div><div class="dot"></div></div>',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+  state.workerMarker = L.marker([30.0561, 31.3395], { icon: workerIcon, zIndexOffset: 1000 });
+
+  const siteIcon = L.divIcon({
+    className: "",
+    html: '<div class="site-marker"></div>',
+    iconSize: [14, 14],
+    iconAnchor: [7, 12],
+  });
+  state.siteMarker = L.marker([30.0561, 31.3395], { icon: siteIcon });
+
+  state.geofenceCircle = L.circle([30.0561, 31.3395], {
+    radius: 200,
+    color: "#f2a53d",
+    weight: 1.5,
+    fillColor: "#f2a53d",
+    fillOpacity: 0.08,
+  });
+
+  // Leaflet sizes itself from the container at creation time - if any CSS
+  // transition/animation was still settling, the map can render at the
+  // wrong size. One safety recalculation after layout settles fixes that.
+  setTimeout(() => state.map && state.map.invalidateSize(), 200);
+}
+
+// Move the site marker + geofence circle to the currently selected site.
+function updateSiteOnMap() {
+  if (!state.map) return;
+  const site = state.sites.find((s) => s.id === state.selectedSiteId);
+  if (!site) return;
+
+  const latlng = [site.lat, site.lng];
+  state.siteMarker.setLatLng(latlng).addTo(state.map);
+  state.geofenceCircle.setLatLng(latlng).setRadius(site.radius_meters || 200).addTo(state.map);
+
+  // Only auto-fit the view the first time a site appears (avoids yanking
+  // the map around under the worker's finger while they're panning/zooming).
+  if (!state._sitePlaced) {
+    state._sitePlaced = true;
+    fitMapToMarkers();
+  }
+}
+
+function fitMapToMarkers() {
+  if (!state.map || !state.geofenceCircle) return;
+  const bounds = state.geofenceCircle.getBounds();
+  if (state.currentPosition) {
+    bounds.extend([state.currentPosition.lat, state.currentPosition.lng]);
+  }
+  state.map.fitBounds(bounds, { padding: [32, 32], maxZoom: 17 });
 }
 
 async function loadTodayAssignment() {
@@ -195,11 +320,22 @@ function startLocationWatch() {
   // browser remembers it for this site and stops asking.
   navigator.geolocation.watchPosition(
     (position) => {
+      const firstFix = !state.currentPosition;
       state.currentPosition = {
         lat: position.coords.latitude,
         lng: position.coords.longitude,
         accuracy: position.coords.accuracy,
       };
+
+      if (state.map && state.workerMarker) {
+        const latlng = [state.currentPosition.lat, state.currentPosition.lng];
+        state.workerMarker.setLatLng(latlng).addTo(state.map);
+        if (firstFix) {
+          state.map.setView(latlng, 16);
+          fitMapToMarkers();
+        }
+      }
+
       updateDistanceDisplay();
     },
     () => {
@@ -225,6 +361,8 @@ function updateDistanceDisplay() {
   const pill = document.getElementById("status-pill");
   const button = document.getElementById("checkin-button");
   const site = state.sites.find((s) => s.id === state.selectedSiteId);
+
+  updateSiteOnMap();
 
   if (!state.currentPosition || !site) {
     pill.textContent = "Locating…";
