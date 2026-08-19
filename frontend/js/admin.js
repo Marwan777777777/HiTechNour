@@ -17,8 +17,98 @@ async function enterAdmin(user) {
   dateInput.value = new Date().toISOString().slice(0, 10);
   dateInput.addEventListener("change", () => loadAssignments(dateInput.value));
 
-  await Promise.all([loadFlaggedQueue(), loadTeam(), loadAdminSites()]);
+  const workersMonthInput = document.getElementById("workers-month");
+  workersMonthInput.value = new Date().toISOString().slice(0, 7);
+  workersMonthInput.addEventListener("change", () => loadWorkers(workersMonthInput.value));
+
+  await Promise.all([loadFlaggedQueue(), loadTeam(), loadAdminSites(), loadWorkers(workersMonthInput.value)]);
   await loadAssignments(dateInput.value);
+}
+
+// ---- Workers dashboard ----
+async function loadWorkers(month) {
+  const list = document.getElementById("workers-list");
+  try {
+    const users = adminState.users.length ? adminState.users : await Api.getUsers();
+    adminState.users = users;
+    list.innerHTML = "";
+    users.forEach((u) => {
+      const li = document.createElement("li");
+      li.className = "admin-item";
+      li.innerHTML = `
+        <div>
+          <div>${u.full_name}</div>
+          <div class="meta">@${u.username} · ${u.role}</div>
+        </div>
+        <button class="secondary-button" data-worker-id="${u.id}">View</button>
+      `;
+      list.appendChild(li);
+    });
+    list.querySelectorAll("[data-worker-id]").forEach((btn) => {
+      btn.addEventListener("click", () => openWorkerDetail(btn.dataset.workerId, month));
+    });
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function openWorkerDetail(userId, month) {
+  try {
+    const summary = await Api.workerSummary(userId, month);
+    const { user, attendance, tasks, teammates } = summary;
+    const pct = attendance.daysInMonth
+      ? Math.round((attendance.daysPresent / attendance.daysInMonth) * 100)
+      : 0;
+
+    const tasksHtml = tasks.length
+      ? tasks
+          .map(
+            (t) => `
+        <li class="admin-item">
+          <div>
+            <div>${t.site_name}${t.task ? ` · ${t.task}` : ""}</div>
+            <div class="meta">${t.start_date} → ${t.end_date}</div>
+          </div>
+        </li>`
+          )
+          .join("")
+      : `<li class="admin-item"><div>No assignments this month.</div></li>`;
+
+    const teamHtml = teammates.length
+      ? teammates
+          .map(
+            (t) => `
+        <li class="admin-item">
+          <div>
+            <div>${t.full_name}</div>
+            <div class="meta">@${t.username} · ${t.site_name}</div>
+          </div>
+        </li>`
+          )
+          .join("")
+      : `<li class="admin-item"><div>Worked alone this month.</div></li>`;
+
+    openReadOnlyModal(
+      `${user.fullName}`,
+      `
+      <div class="worker-detail">
+        <div class="attendance-summary-head">
+          <h3>Attendance — ${attendance.month}</h3>
+        </div>
+        <div class="attendance-days">${attendance.daysPresent} / ${attendance.daysInMonth} days</div>
+        <div class="attendance-bar"><div class="attendance-bar-fill" style="width:${pct}%"></div></div>
+
+        <h3 class="worker-detail-heading">Tasks &amp; Sites</h3>
+        <ul class="admin-list">${tasksHtml}</ul>
+
+        <h3 class="worker-detail-heading">Team</h3>
+        <ul class="admin-list">${teamHtml}</ul>
+      </div>
+    `
+    );
+  } catch (err) {
+    showToast(err.message, "error");
+  }
 }
 
 document.getElementById("admin-logout-button").addEventListener("click", () => {
@@ -355,8 +445,28 @@ document.getElementById("export-button").addEventListener("click", async () => {
   }
 });
 
+// ---- Read-only modal (worker detail, etc.) - single "Close" button, no
+// confirm/cancel pair since there's nothing to submit. ----
+function openReadOnlyModal(title, bodyHtml) {
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-body").innerHTML = bodyHtml;
+  document.getElementById("modal").classList.remove("hidden");
+
+  const confirmBtn = document.getElementById("modal-confirm");
+  const cancelBtn = document.getElementById("modal-cancel");
+  const closeModal = () => document.getElementById("modal").classList.add("hidden");
+
+  const newConfirm = confirmBtn.cloneNode(true);
+  newConfirm.textContent = "Close";
+  confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
+  newConfirm.addEventListener("click", closeModal);
+
+  cancelBtn.classList.add("hidden");
+}
+
 // ---- Modal helper ----
 function openModal(title, bodyHtml, onConfirm) {
+  document.getElementById("modal-cancel").classList.remove("hidden");
   document.getElementById("modal-title").textContent = title;
   document.getElementById("modal-body").innerHTML = bodyHtml;
   document.getElementById("modal").classList.remove("hidden");
