@@ -51,9 +51,17 @@ async function apiRequest(path, { method = "GET", body, isBlob = false } = {}) {
   }
 
   if (response.status === 401) {
-    Auth.logout();
-    window.location.reload();
-    throw new Error("Session expired. Please sign in again.");
+    if (token) {
+      // We sent a token and got rejected - that's a genuinely dead/expired
+      // session, so force back to login.
+      Auth.logout();
+      window.location.reload();
+      throw new Error("Session expired. Please sign in again.");
+    }
+    // No token was sent (e.g. this was a login attempt itself) - a 401
+    // here just means wrong username/password, not an expired session.
+    // Fall through so the real error message reaches the caller instead
+    // of getting masked by a reload.
   }
 
   if (isBlob) {
