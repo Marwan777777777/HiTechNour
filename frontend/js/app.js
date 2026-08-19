@@ -167,8 +167,6 @@ function initMap() {
   }
 
   state.map = L.map("site-map", {
-
-  state.map = L.map("site-map", {
     zoomControl: true,
     attributionControl: true,
   }).setView([30.0561, 31.3395], 14); // Nasr City, Cairo default until we have a fix
