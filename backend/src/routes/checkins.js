@@ -5,6 +5,7 @@ const { checkinLimiter } = require("../middleware/rateLimit");
 const { haversineMeters } = require("../utils/geo");
 const { isImpossibleTravel } = require("../utils/impossibleTravel");
 const { isValidLat, isValidLng, isNonEmptyString } = require("../utils/validate");
+const { getMonthlyAttendance } = require("../utils/attendance");
 
 const router = express.Router();
 
@@ -163,6 +164,18 @@ router.get("/me", requireAuth, async (req, res, next) => {
     );
     const isCheckedIn = rows[0]?.type === "check_in";
     res.json({ isCheckedIn, history: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Worker: their own "days present this month" - the same number the admin
+// sees on the worker-detail dashboard, so there's no room for it to look
+// different depending on who's asking. ?month=YYYY-MM, defaults to current.
+router.get("/me/summary", requireAuth, async (req, res, next) => {
+  try {
+    const summary = await getMonthlyAttendance(req.user.id, req.query.month);
+    res.json(summary);
   } catch (err) {
     next(err);
   }
