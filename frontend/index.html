@@ -14,7 +14,15 @@
 <meta name="apple-mobile-web-app-title" content="HTN Attendance" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
 <link rel="stylesheet" href="css/styles.css" />
+
+<!-- Leaflet (free, no API key) — real map + live position -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 </head>
 <body>
 
@@ -29,7 +37,11 @@
 <div id="login-screen" class="screen hidden">
   <div class="login-card">
     <div class="brand">
-      <div class="brand-mark"></div>
+      <svg class="brand-mark" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="26" cy="26" r="24" stroke="#2b3a5c" stroke-width="1.5"/>
+        <circle cx="26" cy="26" r="16" stroke="#7a5622" stroke-width="1.5" stroke-dasharray="2 3"/>
+        <circle cx="26" cy="26" r="6" fill="#f2a53d"/>
+      </svg>
       <h1>HighTechNour</h1>
       <p class="brand-sub">Site Attendance</p>
     </div>
@@ -40,7 +52,7 @@
       <label>Password
         <input type="password" id="login-password" autocomplete="current-password" required />
       </label>
-      <button type="submit" id="login-button">Sign In</button>
+      <button type="submit" id="login-button" class="primary-button">Sign In</button>
       <p id="login-error" class="error-text hidden"></p>
     </form>
   </div>
@@ -63,14 +75,8 @@
 
     <div id="assignment-banner" class="banner banner-assignment hidden"></div>
 
-    <div class="radar-wrap">
-      <svg id="radar" viewBox="0 0 220 220" class="radar-svg">
-        <circle cx="110" cy="110" r="95" class="radar-ring radar-ring-outer"></circle>
-        <circle cx="110" cy="110" r="65" class="radar-ring radar-ring-mid"></circle>
-        <circle cx="110" cy="110" r="35" class="radar-ring radar-ring-inner"></circle>
-        <circle id="radar-pulse" cx="110" cy="110" r="35" class="radar-pulse"></circle>
-        <circle cx="110" cy="110" r="8" class="radar-pin"></circle>
-      </svg>
+    <div class="map-wrap">
+      <div id="site-map" class="site-map"></div>
       <div id="status-pill" class="status-pill status-idle">Locating…</div>
     </div>
 
@@ -162,6 +168,8 @@
       ? "http://localhost:4000/api"
       : "https://welcoming-blessing-production-6f01.up.railway.app/api";
 </script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="js/api.js"></script>
 <script src="js/app.js"></script>
 <script src="js/admin.js"></script>
