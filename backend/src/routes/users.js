@@ -3,6 +3,7 @@ const bcrypt = require("bcrypt");
 const pool = require("../db");
 const { requireAuth, requireAdmin } = require("../middleware/auth");
 const { isNonEmptyString } = require("../utils/validate");
+const { getMonthlyAttendance, resolveMonth } = require("../utils/attendance");
 
 const router = express.Router();
 
@@ -17,6 +18,64 @@ router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
        FROM users ORDER BY full_name`
     );
     res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Admin: one worker's dashboard for a given month - attendance (days
+// present out of days in month), their assignments/tasks, and who they
+// worked alongside (teammates = other workers assigned to the same site
+// with overlapping dates). Powers the worker-detail view.
+router.get("/:id/summary", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const userResult = await pool.query(
+      "SELECT id, username, full_name, phone, role, active, created_at FROM users WHERE id = $1",
+      [req.params.id]
+    );
+    const user = userResult.rows[0];
+    if (!user) return res.status(404).json({ error: "User not found." });
+
+    const attendance = await getMonthlyAttendance(req.params.id, req.query.month);
+    const { start, end } = resolveMonth(req.query.month);
+
+    const tasksResult = await pool.query(
+      `SELECT a.id, a.site_id, s.name AS site_name, a.task, a.start_date, a.end_date
+       FROM assignments a
+       JOIN sites s ON s.id = a.site_id
+       WHERE a.user_id = $1 AND a.start_date < $3 AND a.end_date >= $2
+       ORDER BY a.start_date`,
+      [req.params.id, start, end]
+    );
+
+    // Teammates: anyone else assigned to the same site with a date range
+    // that overlaps this worker's assignment for the month.
+    const teamResult = await pool.query(
+      `SELECT DISTINCT u.id, u.full_name, u.username, s.name AS site_name
+       FROM assignments a
+       JOIN assignments mine ON mine.site_id = a.site_id
+         AND mine.user_id = $1
+         AND a.start_date <= mine.end_date AND a.end_date >= mine.start_date
+       JOIN users u ON u.id = a.user_id
+       JOIN sites s ON s.id = a.site_id
+       WHERE a.user_id != $1 AND a.start_date < $3 AND a.end_date >= $2
+       ORDER BY u.full_name`,
+      [req.params.id, start, end]
+    );
+
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        fullName: user.full_name,
+        phone: user.phone,
+        role: user.role,
+        active: user.active,
+      },
+      attendance,
+      tasks: tasksResult.rows,
+      teammates: teamResult.rows,
+    });
   } catch (err) {
     next(err);
   }
