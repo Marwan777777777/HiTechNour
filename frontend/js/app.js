@@ -151,7 +151,25 @@ async function enterApp(user) {
   await loadSites();
   await loadTodayAssignment();
   await loadHistory();
+  await loadAttendanceSummary();
   startLocationWatch();
+}
+
+// ---- My Attendance (days present this month) ----
+async function loadAttendanceSummary() {
+  try {
+    const summary = await Api.myAttendanceSummary();
+    const pct = summary.daysInMonth
+      ? Math.round((summary.daysPresent / summary.daysInMonth) * 100)
+      : 0;
+    document.getElementById("attendance-days").textContent =
+      `${summary.daysPresent} / ${summary.daysInMonth} days`;
+    document.getElementById("attendance-bar-fill").style.width = `${pct}%`;
+    document.getElementById("attendance-month-label").textContent = summary.month;
+  } catch {
+    // Non-critical - if this fails, leave the placeholder text in place
+    // rather than blocking the rest of the app screen.
+  }
 }
 
 // ---- Live map ----
