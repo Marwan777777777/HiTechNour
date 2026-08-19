@@ -86,6 +86,15 @@
 
     <button id="checkin-button" class="primary-button" disabled>Check In</button>
 
+    <section class="attendance-summary">
+      <div class="attendance-summary-head">
+        <h2>My Attendance</h2>
+        <span id="attendance-month-label" class="meta"></span>
+      </div>
+      <div id="attendance-days" class="attendance-days">—</div>
+      <div class="attendance-bar"><div id="attendance-bar-fill" class="attendance-bar-fill"></div></div>
+    </section>
+
     <section class="history">
       <h2>Recent Activity</h2>
       <ul id="history-list" class="history-list"></ul>
@@ -106,6 +115,7 @@
   <nav class="tabs">
     <button class="tab-button active" data-tab="flagged">Review Queue</button>
     <button class="tab-button" data-tab="team">Team</button>
+    <button class="tab-button" data-tab="workers">Workers</button>
     <button class="tab-button" data-tab="assignments">Assignments</button>
     <button class="tab-button" data-tab="sites">Sites</button>
     <button class="tab-button" data-tab="export">Export</button>
@@ -121,6 +131,12 @@
       <h2>Team</h2>
       <button id="add-user-button" class="secondary-button">+ Add Worker</button>
       <ul id="team-list" class="admin-list"></ul>
+    </section>
+
+    <section id="tab-workers" class="tab-panel hidden">
+      <h2>Workers</h2>
+      <label>Month <input type="month" id="workers-month" /></label>
+      <ul id="workers-list" class="admin-list"></ul>
     </section>
 
     <section id="tab-assignments" class="tab-panel hidden">
