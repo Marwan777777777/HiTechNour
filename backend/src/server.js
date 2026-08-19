@@ -11,6 +11,13 @@ const assignmentRoutes = require("./routes/assignments");
 
 const app = express();
 
+// Railway (like most hosts) puts the app behind a reverse proxy and sets
+// X-Forwarded-For. Without telling Express to trust exactly one hop of
+// proxy, express-rate-limit refuses to read that header and throws
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every request that hits a rate
+// limiter (login, check-ins) - which was crashing login entirely.
+app.set("trust proxy", 1);
+
 app.use(express.json({ limit: "100kb" }));
 
 const allowedOrigins = (process.env.CORS_ORIGIN || "")
