@@ -87,6 +87,9 @@ const Api = {
     apiRequest("/auth/login", { method: "POST", body: { username, password } }),
   me: () => apiRequest("/auth/me"),
 
+  myAttendanceSummary: (month) => apiRequest(`/checkins/me/summary${month ? `?month=${month}` : ""}`),
+  workerSummary: (id, month) => apiRequest(`/users/${id}/summary${month ? `?month=${month}` : ""}`),
+
   getSites: () => apiRequest("/sites"),
   createSite: (site) => apiRequest("/sites", { method: "POST", body: site }),
   updateSite: (id, patch) => apiRequest(`/sites/${id}`, { method: "PUT", body: patch }),
