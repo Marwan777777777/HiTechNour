@@ -160,6 +160,14 @@ async function enterApp(user) {
 function initMap() {
   if (state.map) return; // already initialized (e.g. re-entering app screen)
 
+  if (typeof L === "undefined") {
+    const container = document.getElementById("site-map");
+    if (container) container.textContent = "Map failed to load — check your connection.";
+    return;
+  }
+
+  state.map = L.map("site-map", {
+
   state.map = L.map("site-map", {
     zoomControl: true,
     attributionControl: true,
