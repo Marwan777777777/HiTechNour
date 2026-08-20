@@ -91,6 +91,25 @@ const Api = {
   workerSummary: (id, month) => apiRequest(`/users/${id}/summary${month ? `?month=${month}` : ""}`),
 
   getSites: () => apiRequest("/sites"),
+
+  getSkills: () => apiRequest("/skills"),
+  createSkill: (name) => apiRequest("/skills", { method: "POST", body: JSON.stringify({ name }) }),
+  getSkillWorkers: (skillId) => apiRequest(`/skills/${skillId}/workers`),
+  setWorkerSkill: (userId, skillId, level, notes) =>
+    apiRequest(`/skills/users/${userId}`, {
+      method: "POST",
+      body: JSON.stringify({ skillId, level, notes }),
+    }),
+  removeWorkerSkill: (userId, skillId) =>
+    apiRequest(`/skills/users/${userId}/${skillId}`, { method: "DELETE" }),
+  getSiteRequirements: (siteId) => apiRequest(`/skills/sites/${siteId}`),
+  setSiteRequirement: (siteId, skillId, workersNeeded) =>
+    apiRequest(`/skills/sites/${siteId}`, {
+      method: "POST",
+      body: JSON.stringify({ skillId, workersNeeded }),
+    }),
+  removeSiteRequirement: (siteId, skillId) =>
+    apiRequest(`/skills/sites/${siteId}/${skillId}`, { method: "DELETE" }),
   createSite: (site) => apiRequest("/sites", { method: "POST", body: site }),
   updateSite: (id, patch) => apiRequest(`/sites/${id}`, { method: "PUT", body: patch }),
 
