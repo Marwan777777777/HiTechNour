@@ -1,4 +1,4 @@
-const adminState = { users: [], sites: [] };
+const adminState = { users: [], sites: [], skills: [] };
 
 async function enterAdmin(user) {
   showScreen("admin-screen");
@@ -54,8 +54,9 @@ async function loadWorkers(month) {
 
 async function openWorkerDetail(userId, month) {
   try {
+    await ensureSkillsLoaded();
     const summary = await Api.workerSummary(userId, month);
-    const { user, attendance, tasks, teammates } = summary;
+    const { user, attendance, tasks, teammates, skills } = summary;
     const pct = attendance.daysInMonth
       ? Math.round((attendance.daysPresent / attendance.daysInMonth) * 100)
       : 0;
@@ -88,6 +89,25 @@ async function openWorkerDetail(userId, month) {
           .join("")
       : `<li class="admin-item"><div>Worked alone this month.</div></li>`;
 
+    const skillTagsHtml = skills.length
+      ? skills
+          .map(
+            (s) => `
+        <span class="skill-tag">
+          ${s.name}
+          <span class="level-dots">${[1, 2, 3, 4, 5]
+            .map((n) => `<span class="${n <= s.level ? "filled" : ""}"></span>`)
+            .join("")}</span>
+          <button class="remove-skill" data-remove-skill-id="${s.skill_id}" title="Remove">×</button>
+        </span>`
+          )
+          .join("")
+      : `<span class="meta">No skills tagged yet.</span>`;
+
+    const skillOptions = adminState.skills.length
+      ? adminState.skills.map((s) => `<option value="${s.id}">${s.name}</option>`).join("")
+      : `<option disabled>No skill tags yet - add some under Sites → Manage Skill Tags</option>`;
+
     openReadOnlyModal(
       `${user.fullName}`,
       `
@@ -98,6 +118,20 @@ async function openWorkerDetail(userId, month) {
         <div class="attendance-days">${attendance.daysPresent} / ${attendance.daysInMonth} days</div>
         <div class="attendance-bar"><div class="attendance-bar-fill" style="width:${pct}%"></div></div>
 
+        <h3 class="worker-detail-heading">Skills</h3>
+        <div class="skill-tag-row">${skillTagsHtml}</div>
+        <div class="modal-inline-form">
+          <select id="w-skill-select">${skillOptions}</select>
+          <select id="w-skill-level">
+            <option value="1">Level 1</option>
+            <option value="2">Level 2</option>
+            <option value="3" selected>Level 3</option>
+            <option value="4">Level 4</option>
+            <option value="5">Level 5</option>
+          </select>
+          <button id="add-worker-skill-btn" class="secondary-button">+ Tag</button>
+        </div>
+
         <h3 class="worker-detail-heading">Tasks &amp; Sites</h3>
         <ul class="admin-list">${tasksHtml}</ul>
 
@@ -106,6 +140,33 @@ async function openWorkerDetail(userId, month) {
       </div>
     `
     );
+
+    document.querySelectorAll("[data-remove-skill-id]").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        try {
+          await Api.removeWorkerSkill(userId, btn.dataset.removeSkillId);
+          openWorkerDetail(userId, month);
+        } catch (err) {
+          showToast(err.message, "error");
+        }
+      });
+    });
+
+    const addSkillBtn = document.getElementById("add-worker-skill-btn");
+    if (addSkillBtn) {
+      addSkillBtn.addEventListener("click", async () => {
+        const skillId = document.getElementById("w-skill-select").value;
+        const level = Number(document.getElementById("w-skill-level").value);
+        try {
+          await Api.setWorkerSkill(userId, skillId, level);
+          showToast("Skill tagged.", "success");
+          openWorkerDetail(userId, month);
+        } catch (err) {
+          showToast(err.message, "error");
+        }
+      });
+    }
   } catch (err) {
     showToast(err.message, "error");
   }
@@ -341,9 +402,149 @@ async function loadAdminSites() {
           <div>${s.name}</div>
           <div class="meta">${s.address || ""} · ${s.radius_meters}m radius</div>
         </div>
+        <button class="secondary-button" data-req-site-id="${s.id}">Requirements</button>
       `;
       list.appendChild(li);
     });
+    list.querySelectorAll("[data-req-site-id]").forEach((btn) => {
+      const site = sites.find((s) => String(s.id) === btn.dataset.reqSiteId);
+      btn.addEventListener("click", () => openSiteRequirements(site));
+    });
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+// ---- Skill catalog (shared list of tags like "Software", "Gates Tech") ----
+async function ensureSkillsLoaded() {
+  if (!adminState.skills.length) {
+    adminState.skills = await Api.getSkills();
+  }
+  return adminState.skills;
+}
+
+document.getElementById("manage-skills-button").addEventListener("click", async () => {
+  await ensureSkillsLoaded();
+  renderSkillCatalogModal();
+});
+
+function renderSkillCatalogModal() {
+  const rowsHtml = adminState.skills.length
+    ? adminState.skills.map((s) => `<li class="admin-item"><div>${s.name}</div></li>`).join("")
+    : `<li class="admin-item"><div>No skill tags yet - add one below.</div></li>`;
+
+  openReadOnlyModal(
+    "Skill Tags",
+    `
+    <ul class="admin-list">${rowsHtml}</ul>
+    <div class="modal-inline-form">
+      <input id="new-skill-name" placeholder="e.g. Software, Gates Technician, HVAC" />
+      <button id="add-skill-btn" class="secondary-button">+ Add Tag</button>
+    </div>
+  `
+  );
+
+  document.getElementById("add-skill-btn").addEventListener("click", async () => {
+    const input = document.getElementById("new-skill-name");
+    const name = input.value.trim();
+    if (!name) return;
+    try {
+      await Api.createSkill(name);
+      adminState.skills = await Api.getSkills();
+      showToast("Skill tag added.", "success");
+      renderSkillCatalogModal();
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  });
+}
+
+// ---- Site requirements + matching workers ----
+async function openSiteRequirements(site) {
+  try {
+    await ensureSkillsLoaded();
+    const requirements = await Api.getSiteRequirements(site.id);
+
+    const skillOptions = adminState.skills
+      .map((s) => `<option value="${s.id}">${s.name}</option>`)
+      .join("");
+
+    const reqRows = requirements.length
+      ? requirements
+          .map((r) => {
+            const short = r.workers_available < r.workers_needed;
+            return `
+        <div class="requirement-row" data-skill-id="${r.skill_id}" data-skill-name="${r.skill_name}">
+          <span class="req-name">${r.skill_name}</span>
+          <span class="req-count ${short ? "shortfall" : "met"}">
+            needs ${r.workers_needed} · ${r.workers_available} available
+          </span>
+        </div>`;
+          })
+          .join("")
+      : `<div class="meta">No skill requirements set for this site yet.</div>`;
+
+    openReadOnlyModal(
+      `${site.name} — Requirements`,
+      `
+      <div>${reqRows}</div>
+      <div class="modal-inline-form">
+        <select id="req-skill-select">${skillOptions || "<option disabled>No skill tags yet</option>"}</select>
+        <input id="req-count-input" type="number" min="1" value="1" style="width:70px" />
+        <button id="add-requirement-btn" class="secondary-button">+ Add</button>
+      </div>
+    `
+    );
+
+    document.querySelectorAll(".requirement-row").forEach((row) => {
+      row.addEventListener("click", () =>
+        openSkillMatches(row.dataset.skillId, row.dataset.skillName)
+      );
+    });
+
+    const addBtn = document.getElementById("add-requirement-btn");
+    if (addBtn) {
+      addBtn.addEventListener("click", async () => {
+        const skillId = document.getElementById("req-skill-select").value;
+        const workersNeeded = Number(document.getElementById("req-count-input").value) || 1;
+        try {
+          await Api.setSiteRequirement(site.id, skillId, workersNeeded);
+          showToast("Requirement saved.", "success");
+          openSiteRequirements(site);
+        } catch (err) {
+          showToast(err.message, "error");
+        }
+      });
+    }
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+// The "click a required skill, see everyone who fits" view.
+async function openSkillMatches(skillId, skillName) {
+  try {
+    const workers = await Api.getSkillWorkers(skillId);
+    const rows = workers.length
+      ? workers
+          .map(
+            (w) => `
+        <li class="admin-item">
+          <div>
+            <div>${w.full_name}${w.active ? "" : " (inactive)"}</div>
+            <div class="meta">@${w.username}${w.phone ? ` · ${w.phone}` : ""}</div>
+          </div>
+          <span class="skill-tag">
+            <span class="level-dots">${[1, 2, 3, 4, 5]
+              .map((n) => `<span class="${n <= w.level ? "filled" : ""}"></span>`)
+              .join("")}</span>
+          </span>
+        </li>`
+          )
+          .join("")
+      : `<li class="admin-item"><div>No workers tagged with this skill yet.</div></li>`;
+
+    openReadOnlyModal(`Workers: ${skillName}`, `<ul class="admin-list">${rows}</ul>`);
   } catch (err) {
     showToast(err.message, "error");
   }
