@@ -67,6 +67,18 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`HighTechNour attendance backend listening on port ${PORT}`);
-});
+const { applyMigrations } = require("./migrate");
+
+// Applies any pending schema changes before accepting traffic, so a
+// deploy that adds new tables/columns just works - no separate manual
+// migration step needed on every push.
+applyMigrations()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`HighTechNour attendance backend listening on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("[migrate] Failed to apply migrations, server not started:", err);
+    process.exit(1);
+  });
