@@ -32,6 +32,10 @@ async function loadWorkers(month) {
     const users = adminState.users.length ? adminState.users : await Api.getUsers();
     adminState.users = users;
     list.innerHTML = "";
+    if (users.length === 0) {
+      list.innerHTML = `<li class="admin-item is-empty">No workers yet.</li>`;
+      return;
+    }
     users.forEach((u) => {
       const li = document.createElement("li");
       li.className = "admin-item";
@@ -60,6 +64,7 @@ async function openWorkerDetail(userId, month) {
     const pct = attendance.daysInMonth
       ? Math.round((attendance.daysPresent / attendance.daysInMonth) * 100)
       : 0;
+    const tier = pct < 50 ? "tier-low" : pct < 80 ? "tier-mid" : "tier-high";
 
     const tasksHtml = tasks.length
       ? tasks
@@ -73,7 +78,7 @@ async function openWorkerDetail(userId, month) {
         </li>`
           )
           .join("")
-      : `<li class="admin-item"><div>No assignments this month.</div></li>`;
+      : `<li class="admin-item is-empty">No assignments this month.</li>`;
 
     const teamHtml = teammates.length
       ? teammates
@@ -87,7 +92,7 @@ async function openWorkerDetail(userId, month) {
         </li>`
           )
           .join("")
-      : `<li class="admin-item"><div>Worked alone this month.</div></li>`;
+      : `<li class="admin-item is-empty">Worked alone this month.</li>`;
 
     const skillTagsHtml = skills.length
       ? skills
@@ -116,7 +121,7 @@ async function openWorkerDetail(userId, month) {
           <h3>Attendance — ${attendance.month}</h3>
         </div>
         <div class="attendance-days">${attendance.daysPresent} / ${attendance.daysInMonth} days</div>
-        <div class="attendance-bar"><div class="attendance-bar-fill" style="width:${pct}%"></div></div>
+        <div class="attendance-bar"><div class="attendance-bar-fill ${tier}" style="width:${pct}%"></div></div>
 
         <h3 class="worker-detail-heading">Skills</h3>
         <div class="skill-tag-row">${skillTagsHtml}</div>
@@ -184,7 +189,7 @@ async function loadFlaggedQueue() {
     const items = await Api.allCheckins(true);
     list.innerHTML = "";
     if (items.length === 0) {
-      list.innerHTML = `<li class="admin-item"><div>Nothing pending review.</div></li>`;
+      list.innerHTML = `<li class="admin-item is-empty">Nothing pending review.</li>`;
       return;
     }
     items.forEach((item) => {
@@ -226,6 +231,10 @@ async function loadTeam() {
     const users = await Api.getUsers();
     adminState.users = users;
     list.innerHTML = "";
+    if (users.length === 0) {
+      list.innerHTML = `<li class="admin-item is-empty">No team members yet.</li>`;
+      return;
+    }
     users.forEach((u) => {
       const li = document.createElement("li");
       li.className = "admin-item";
@@ -324,7 +333,7 @@ async function loadAssignments(date) {
     const assignments = await Api.getAssignments(date);
     list.innerHTML = "";
     if (assignments.length === 0) {
-      list.innerHTML = `<li class="admin-item"><div>No one assigned for this date.</div></li>`;
+      list.innerHTML = `<li class="admin-item is-empty">No one assigned for this date.</li>`;
       return;
     }
     assignments.forEach((a) => {
@@ -394,6 +403,10 @@ async function loadAdminSites() {
     const sites = await Api.getSites();
     adminState.sites = sites;
     list.innerHTML = "";
+    if (sites.length === 0) {
+      list.innerHTML = `<li class="admin-item is-empty">No sites yet - add one below.</li>`;
+      return;
+    }
     sites.forEach((s) => {
       const li = document.createElement("li");
       li.className = "admin-item";
@@ -431,7 +444,7 @@ document.getElementById("manage-skills-button").addEventListener("click", async 
 function renderSkillCatalogModal() {
   const rowsHtml = adminState.skills.length
     ? adminState.skills.map((s) => `<li class="admin-item"><div>${s.name}</div></li>`).join("")
-    : `<li class="admin-item"><div>No skill tags yet - add one below.</div></li>`;
+    : `<li class="admin-item is-empty">No skill tags yet - add one below.</li>`;
 
   openReadOnlyModal(
     "Skill Tags",
@@ -542,7 +555,7 @@ async function openSkillMatches(skillId, skillName) {
         </li>`
           )
           .join("")
-      : `<li class="admin-item"><div>No workers tagged with this skill yet.</div></li>`;
+      : `<li class="admin-item is-empty">No workers tagged with this skill yet.</li>`;
 
     openReadOnlyModal(`Workers: ${skillName}`, `<ul class="admin-list">${rows}</ul>`);
   } catch (err) {
@@ -633,6 +646,8 @@ document.getElementById("export-button").addEventListener("click", async () => {
     showToast("Pick a start and end date.", "error");
     return;
   }
+  const button = document.getElementById("export-button");
+  setButtonLoading(button, true);
   try {
     const blob = await Api.exportCsv(start, end);
     const url = URL.createObjectURL(blob);
@@ -643,6 +658,8 @@ document.getElementById("export-button").addEventListener("click", async () => {
     URL.revokeObjectURL(url);
   } catch (err) {
     showToast(err.message, "error");
+  } finally {
+    setButtonLoading(button, false);
   }
 });
 
@@ -658,7 +675,7 @@ function openReadOnlyModal(title, bodyHtml) {
   const closeModal = () => document.getElementById("modal").classList.add("hidden");
 
   const newConfirm = confirmBtn.cloneNode(true);
-  newConfirm.textContent = "Close";
+  newConfirm.querySelector(".btn-label").textContent = "Close";
   confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
   newConfirm.addEventListener("click", closeModal);
 
@@ -677,19 +694,20 @@ function openModal(title, bodyHtml, onConfirm) {
 
   const closeModal = () => document.getElementById("modal").classList.add("hidden");
   const confirmHandler = async () => {
-    confirmBtn.disabled = true;
+    setButtonLoading(confirmBtn, true);
     try {
       await onConfirm();
       closeModal();
     } catch (err) {
       showToast(err.message, "error");
     } finally {
-      confirmBtn.disabled = false;
+      setButtonLoading(confirmBtn, false);
     }
   };
 
   // Replace nodes to clear any previously-attached listeners.
   const newConfirm = confirmBtn.cloneNode(true);
+  newConfirm.querySelector(".btn-label").textContent = "Save";
   confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
   newConfirm.addEventListener("click", confirmHandler);
 
