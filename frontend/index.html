@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>HighTechNour Attendance</title>
 
 <link rel="manifest" href="manifest.json" />
@@ -51,7 +51,10 @@
       <label>Password
         <input type="password" id="login-password" autocomplete="current-password" required />
       </label>
-      <button type="submit" id="login-button" class="primary-button">Sign In</button>
+      <button type="submit" id="login-button" class="primary-button">
+        <span class="btn-label">Sign In</span>
+        <span class="btn-spinner hidden" aria-hidden="true"></span>
+      </button>
       <p id="login-error" class="error-text hidden"></p>
     </form>
   </div>
@@ -63,7 +66,7 @@
     <div class="topbar-title">HighTechNour</div>
     <div class="topbar-user">
       <span id="user-name"></span>
-      <button id="logout-button" class="icon-button" title="Sign out">⏻</button>
+      <button id="logout-button" class="icon-button" title="Sign out" aria-label="Sign out">⏻</button>
     </div>
   </header>
 
@@ -75,7 +78,9 @@
     <div id="assignment-banner" class="banner banner-assignment hidden"></div>
 
     <div class="map-wrap">
-      <div id="site-map" class="site-map"></div>
+      <div id="site-map" class="site-map">
+        <div id="site-map-skeleton" class="site-map-skeleton" aria-hidden="true"></div>
+      </div>
       <div id="status-pill" class="status-pill status-idle">Locating…</div>
     </div>
 
@@ -84,7 +89,10 @@
       <select id="site-select"></select>
     </div>
 
-    <button id="checkin-button" class="primary-button" disabled>Check In</button>
+    <button id="checkin-button" class="primary-button" disabled>
+      <span class="btn-label">Check In</span>
+      <span class="btn-spinner hidden" aria-hidden="true"></span>
+    </button>
 
     <section class="attendance-summary">
       <div class="attendance-summary-head">
@@ -108,7 +116,7 @@
     <div class="topbar-title">HighTechNour · Admin</div>
     <div class="topbar-user">
       <span id="admin-user-name"></span>
-      <button id="admin-logout-button" class="icon-button" title="Sign out">⏻</button>
+      <button id="admin-logout-button" class="icon-button" title="Sign out" aria-label="Sign out">⏻</button>
     </div>
   </header>
 
@@ -159,7 +167,10 @@
       <h2>Export Report</h2>
       <label>Start Date <input type="date" id="export-start" /></label>
       <label>End Date <input type="date" id="export-end" /></label>
-      <button id="export-button" class="primary-button">Download CSV</button>
+      <button id="export-button" class="primary-button">
+        <span class="btn-label">Download CSV</span>
+        <span class="btn-spinner hidden" aria-hidden="true"></span>
+      </button>
     </section>
   </main>
 </div>
@@ -171,12 +182,16 @@
     <div id="modal-body"></div>
     <div class="modal-actions">
       <button id="modal-cancel" class="secondary-button">Cancel</button>
-      <button id="modal-confirm" class="primary-button">Save</button>
+      <button id="modal-confirm" class="primary-button">
+        <span class="btn-label">Save</span>
+        <span class="btn-spinner hidden" aria-hidden="true"></span>
+      </button>
     </div>
   </div>
 </div>
 
-<div id="toast" class="toast hidden"></div>
+<!-- Toast stack — supports multiple toasts queued without overwriting -->
+<div id="toast-stack" class="toast-stack" aria-live="polite"></div>
 
 <script>
   // Auto-switch: localhost during local dev, Railway URL in production.
