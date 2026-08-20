@@ -63,6 +63,15 @@ router.get("/:id/summary", requireAuth, requireAdmin, async (req, res, next) => 
       [req.params.id, start, end]
     );
 
+    const skillsResult = await pool.query(
+      `SELECT s.id AS skill_id, s.name, ws.level, ws.notes
+       FROM worker_skills ws
+       JOIN skills s ON s.id = ws.skill_id
+       WHERE ws.user_id = $1
+       ORDER BY ws.level DESC, s.name`,
+      [req.params.id]
+    );
+
     res.json({
       user: {
         id: user.id,
@@ -75,6 +84,7 @@ router.get("/:id/summary", requireAuth, requireAdmin, async (req, res, next) => 
       attendance,
       tasks: tasksResult.rows,
       teammates: teamResult.rows,
+      skills: skillsResult.rows,
     });
   } catch (err) {
     next(err);
