@@ -93,12 +93,12 @@ const Api = {
   getSites: () => apiRequest("/sites"),
 
   getSkills: () => apiRequest("/skills"),
-  createSkill: (name) => apiRequest("/skills", { method: "POST", body: JSON.stringify({ name }) }),
+  createSkill: (name) => apiRequest("/skills", { method: "POST", body: { name } }),
   getSkillWorkers: (skillId) => apiRequest(`/skills/${skillId}/workers`),
   setWorkerSkill: (userId, skillId, level, notes) =>
     apiRequest(`/skills/users/${userId}`, {
       method: "POST",
-      body: JSON.stringify({ skillId, level, notes }),
+      body: { skillId, level, notes },
     }),
   removeWorkerSkill: (userId, skillId) =>
     apiRequest(`/skills/users/${userId}/${skillId}`, { method: "DELETE" }),
@@ -106,7 +106,7 @@ const Api = {
   setSiteRequirement: (siteId, skillId, workersNeeded) =>
     apiRequest(`/skills/sites/${siteId}`, {
       method: "POST",
-      body: JSON.stringify({ skillId, workersNeeded }),
+      body: { skillId, workersNeeded },
     }),
   removeSiteRequirement: (siteId, skillId) =>
     apiRequest(`/skills/sites/${siteId}/${skillId}`, { method: "DELETE" }),
