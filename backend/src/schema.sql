@@ -70,3 +70,30 @@ CREATE TABLE IF NOT EXISTS assignments (
 -- this week" (admin) without scanning the whole table.
 CREATE INDEX IF NOT EXISTS idx_assignments_user_dates ON assignments (user_id, start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_assignments_site_dates ON assignments (site_id, start_date, end_date);
+
+-- Skill tags (e.g. "Software", "Gates / Access Control", "HVAC Technician")
+-- that admins define once and reuse across workers and site requirements.
+CREATE TABLE IF NOT EXISTS skills (
+  id    SERIAL PRIMARY KEY,
+  name  TEXT UNIQUE NOT NULL
+);
+
+-- Which skills a worker has, and how good they are at each (1-5). A worker
+-- can have several skills; a skill can belong to many workers.
+CREATE TABLE IF NOT EXISTS worker_skills (
+  user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skill_id  INTEGER NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  level     INTEGER NOT NULL DEFAULT 3 CHECK (level BETWEEN 1 AND 5),
+  notes     TEXT,
+  PRIMARY KEY (user_id, skill_id)
+);
+
+-- What a site needs, e.g. CBD needs 3 workers with "Software" and 2 with
+-- "Gates Technician". Lets the admin click a site, see what's required,
+-- then click a required skill to see which workers fit.
+CREATE TABLE IF NOT EXISTS site_skill_requirements (
+  site_id         INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  skill_id        INTEGER NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  workers_needed  INTEGER NOT NULL DEFAULT 1 CHECK (workers_needed >= 1),
+  PRIMARY KEY (site_id, skill_id)
+);
