@@ -451,6 +451,64 @@ button, input, select { font-family: inherit; }
   margin: 18px 0 9px;
 }
 
+/* ---------- Skills ---------- */
+.button-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.button-row .secondary-button { margin-bottom: 0; }
+
+.skill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+  border: 1px solid rgba(242,165,61,0.35);
+  border-radius: 999px;
+  padding: 3px 10px 3px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.skill-tag .level-dots { display: inline-flex; gap: 2px; }
+.skill-tag .level-dots span {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(242,165,61,0.3);
+}
+.skill-tag .level-dots span.filled { background: var(--accent-strong); }
+.skill-tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.skill-tag button.remove-skill {
+  background: none; border: none; color: inherit; opacity: 0.6;
+  cursor: pointer; font-size: 12px; padding: 0; line-height: 1;
+}
+.skill-tag button.remove-skill:hover { opacity: 1; }
+
+.requirement-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.requirement-row:hover { border-color: var(--border-strong); background: var(--card-hover); }
+.requirement-row .req-name { font-weight: 600; }
+.requirement-row .req-count { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+.requirement-row .req-count.shortfall { color: var(--red); }
+.requirement-row .req-count.met { color: var(--green); }
+.modal-inline-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.modal-inline-form input, .modal-inline-form select {
+  flex: 1;
+  min-width: 100px;
+}
+.modal-inline-form .secondary-button { margin-bottom: 0; white-space: nowrap; }
+
 /* ---------- Section headers ---------- */
 .history h2 {
   font-family: var(--font-mono);
