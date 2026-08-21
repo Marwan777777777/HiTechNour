@@ -39,21 +39,21 @@
         <circle cx="26" cy="26" r="16" stroke="#B8C6EE" stroke-width="1.5" stroke-dasharray="2 3"/>
         <circle cx="26" cy="26" r="6" fill="#2557D6"/>
       </svg>
-      <h1>HighTechNour</h1>
-      <p class="brand-sub">Site Attendance</p>
+      <h1 data-i18n="appName">HighTechNour</h1>
+      <p class="brand-sub" data-i18n="siteAttendance">Site Attendance</p>
     </div>
     <form id="login-form">
-      <label>Username
+      <label><span data-i18n="username">Username</span>
         <input type="text" id="login-username" autocomplete="username" required />
       </label>
-      <label>Password
+      <label><span data-i18n="password">Password</span>
         <div class="password-wrap">
           <input type="password" id="login-password" autocomplete="current-password" required />
           <button type="button" id="toggle-password" class="icon-button" title="Show password">👁</button>
         </div>
       </label>
       <button type="submit" id="login-button" class="primary-button">
-        <span class="btn-label">Sign In</span>
+        <span class="btn-label" data-i18n="signIn">Sign In</span>
         <span class="btn-spinner hidden" aria-hidden="true"></span>
       </button>
       <p id="login-error" class="error-text hidden"></p>
@@ -68,21 +68,21 @@
       <span id="offline-badge" class="offline-badge hidden">0 offline</span>
       <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
       <span id="user-name"></span>
-      <button id="logout-button" class="icon-button" title="Sign out" aria-label="Sign out">⏻</button>
+      <button id="logout-button" class="icon-button" data-i18n-title="logout" title="Sign out" aria-label="Sign out">⏻</button>
     </div>
   </header>
 
   <nav class="worker-tabs">
-    <button class="tab-button active" data-worker-tab="home">Home</button>
-    <button class="tab-button" data-worker-tab="reports">Reports</button>
-    <button class="tab-button" data-worker-tab="alerts">Alerts</button>
-    <button class="tab-button" data-worker-tab="profile">Profile</button>
+    <button class="tab-button active" data-worker-tab="home" data-i18n="home">Home</button>
+    <button class="tab-button" data-worker-tab="reports" data-i18n="reports">Reports</button>
+    <button class="tab-button" data-worker-tab="alerts" data-i18n="alerts">Alerts</button>
+    <button class="tab-button" data-worker-tab="profile" data-i18n="profile">Profile</button>
   </nav>
 
   <main class="main-content">
     <!-- HOME -->
     <div id="panel-home" class="worker-panel">
-      <div id="device-pending-banner" class="banner banner-warning hidden">
+      <div id="device-pending-banner" class="banner banner-warning hidden" data-i18n="pendingDevice">
         Your device is awaiting admin approval. You can't check in until it's approved.
       </div>
 
@@ -92,22 +92,22 @@
         <div id="site-map" class="site-map">
           <div id="site-map-skeleton" class="site-map-skeleton" aria-hidden="true"></div>
         </div>
-        <div id="status-pill" class="status-pill status-idle">Locating…</div>
+        <div id="status-pill" class="status-pill status-idle" data-i18n="locating">Locating…</div>
       </div>
 
       <div class="site-select-wrap">
-        <label for="site-select">Site</label>
+        <label for="site-select" data-i18n="site">Site</label>
         <select id="site-select"></select>
       </div>
 
       <button id="checkin-button" class="primary-button" disabled>
-        <span class="btn-label">Check In</span>
+        <span class="btn-label" data-i18n="checkIn">Check In</span>
         <span class="btn-spinner hidden" aria-hidden="true"></span>
       </button>
 
       <section class="attendance-summary">
         <div class="attendance-summary-head">
-          <h2>My Attendance</h2>
+          <h2 data-i18n="myAttendance">My Attendance</h2>
           <span id="attendance-month-label" class="meta"></span>
         </div>
         <div id="attendance-days" class="attendance-days">—</div>
@@ -115,24 +115,24 @@
       </section>
 
       <section class="history">
-        <h2>Recent Activity</h2>
+        <h2 data-i18n="recentActivity">Recent Activity</h2>
         <ul id="history-list" class="history-list"></ul>
       </section>
     </div>
 
     <!-- REPORTS -->
     <div id="panel-reports" class="worker-panel hidden">
-      <h2>Field Report</h2>
-      <label>Title
-        <input type="text" id="report-title" maxlength="120" placeholder="What happened?" />
+      <h2 data-i18n="fieldReport">Field Report</h2>
+      <label><span data-i18n="title">Title</span>
+        <input type="text" id="report-title" maxlength="120" data-i18n-placeholder="whatHappened" placeholder="What happened?" />
       </label>
-      <label>Details
-        <textarea id="report-body" rows="4" maxlength="4000" placeholder="Describe the situation on site…"></textarea>
+      <label><span data-i18n="details">Details</span>
+        <textarea id="report-body" rows="4" maxlength="4000" data-i18n-placeholder="describeSituation" placeholder="Describe the situation on site…"></textarea>
       </label>
-      <button id="submit-report-btn" class="primary-button">Submit report</button>
+      <button id="submit-report-btn" class="primary-button" data-i18n="submitReport">Submit report</button>
 
       <section class="history" style="margin-top:1.5rem">
-        <h2>My reports</h2>
+        <h2 data-i18n="myReports">My reports</h2>
         <ul id="reports-list" class="history-list"></ul>
       </section>
     </div>
@@ -140,29 +140,29 @@
     <!-- ALERTS -->
     <div id="panel-alerts" class="worker-panel hidden">
       <div class="button-row" style="justify-content:space-between;align-items:center">
-        <h2 style="margin:0">Alerts</h2>
-        <button id="mark-read-btn" class="secondary-button">Mark all read</button>
+        <h2 style="margin:0" data-i18n="alerts">Alerts</h2>
+        <button id="mark-read-btn" class="secondary-button" data-i18n="markRead">Mark all read</button>
       </div>
       <ul id="notifications-list" class="history-list" style="margin-top:1rem"></ul>
     </div>
 
     <!-- PROFILE -->
     <div id="panel-profile" class="worker-panel hidden">
-      <h2>Profile</h2>
-      <label>Full name
+      <h2 data-i18n="profile">Profile</h2>
+      <label><span data-i18n="fullName">Full name</span>
         <input type="text" id="profile-name" />
       </label>
-      <label>Phone
+      <label><span data-i18n="phone">Phone</span>
         <input type="text" id="profile-phone" />
       </label>
-      <label>Language
+      <label><span data-i18n="language">Language</span>
         <select id="profile-locale">
           <option value="en">English</option>
           <option value="ar">العربية</option>
         </select>
       </label>
-      <button id="save-profile-btn" class="primary-button">Save</button>
-      <button id="delete-account-btn" class="secondary-button" style="margin-top:1rem;color:#b91c1c">Delete my account</button>
+      <button id="save-profile-btn" class="primary-button" data-i18n="save">Save</button>
+      <button id="delete-account-btn" class="secondary-button" style="margin-top:1rem;color:#b91c1c" data-i18n="deleteAccount">Delete my account</button>
     </div>
   </main>
 </div>
