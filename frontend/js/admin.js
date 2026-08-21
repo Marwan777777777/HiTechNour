@@ -66,6 +66,37 @@ async function openWorkerDetail(userId, month) {
       : 0;
     const tier = pct < 50 ? "tier-low" : pct < 80 ? "tier-mid" : "tier-high";
 
+    // Check-in/check-out log for this worker. There's no per-worker
+    // endpoint yet, so this filters the existing admin check-in feed by
+    // username client-side. Fine at current scale; if the org grows large
+    // enough that /checkins gets slow, add a ?userId= filter server-side
+    // and swap this for that instead of filtering in the browser.
+    let logsHtml = `<li class="admin-item is-empty">Loading…</li>`;
+    try {
+      const allLogs = await Api.allCheckins(false);
+      const workerLogs = allLogs
+        .filter((c) => c.username === user.username)
+        .slice(0, 30);
+      logsHtml = workerLogs.length
+        ? workerLogs
+            .map((c) => {
+              const inside = c.status === "inside";
+              const time = new Date(c.created_at).toLocaleString();
+              return `
+        <li class="admin-item ${inside ? "is-inside" : "is-outside"}">
+          <div>
+            <div>${c.type === "check_in" ? "Checked in" : "Checked out"} · ${c.site_name}</div>
+            <div class="meta">${time} · ${Math.round(c.distance_meters)}m</div>
+          </div>
+          <span class="badge ${inside ? "badge-inside" : "badge-outside"}">${c.status}</span>
+        </li>`;
+            })
+            .join("")
+        : `<li class="admin-item is-empty">No check-in activity yet.</li>`;
+    } catch {
+      logsHtml = `<li class="admin-item is-empty">Couldn't load logs.</li>`;
+    }
+
     const tasksHtml = tasks.length
       ? tasks
           .map(
@@ -142,6 +173,9 @@ async function openWorkerDetail(userId, month) {
 
         <h3 class="worker-detail-heading">Team</h3>
         <ul class="admin-list">${teamHtml}</ul>
+
+        <h3 class="worker-detail-heading">Check-in / Check-out Log</h3>
+        <ul class="admin-list">${logsHtml}</ul>
       </div>
     `
     );
