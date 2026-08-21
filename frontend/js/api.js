@@ -110,6 +110,12 @@ const Api = {
     }),
   removeSiteRequirement: (siteId, skillId) =>
     apiRequest(`/skills/sites/${siteId}/${skillId}`, { method: "DELETE" }),
+
+  getOverview: () => apiRequest("/reports/overview"),
+  getTeamBySite: () => apiRequest("/reports/team"),
+  getWorkerDaily: (id, month) => apiRequest(`/users/${id}/daily${month ? `?month=${month}` : ""}`),
+  updateUser: (id, patch) => apiRequest(`/users/${id}`, { method: "PATCH", body: patch }),
+  getAllCheckins: () => apiRequest("/checkins"),
   createSite: (site) => apiRequest("/sites", { method: "POST", body: site }),
   updateSite: (id, patch) => apiRequest(`/sites/${id}`, { method: "PUT", body: patch }),
 
