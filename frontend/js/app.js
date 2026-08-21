@@ -1,10 +1,12 @@
 // ---- Shared helpers ----
 function showToast(message, kind = "") {
-  const toast = document.getElementById("toast");
-  toast.textContent = message;
+  const stack = document.getElementById("toast-stack");
+  if (!stack) return;
+  const toast = document.createElement("div");
   toast.className = "toast" + (kind ? ` toast-${kind}` : "");
-  toast.classList.remove("hidden");
-  setTimeout(() => toast.classList.add("hidden"), 3200);
+  toast.textContent = message;
+  stack.appendChild(toast);
+  setTimeout(() => toast.remove(), 3200);
 }
 
 function vibrate(pattern) {
@@ -112,7 +114,7 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   const errorEl = document.getElementById("login-error");
   errorEl.classList.add("hidden");
   button.disabled = true;
-  button.textContent = "Signing in…";
+  button.classList.add("is-loading");
 
   try {
     const result = await Api.login(username, password);
@@ -130,7 +132,7 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
     errorEl.classList.remove("hidden");
   } finally {
     button.disabled = false;
-    button.textContent = "Sign In";
+    button.classList.remove("is-loading");
   }
 });
 
@@ -194,7 +196,7 @@ function initMap() {
   }).setView([30.0561, 31.3395], 14); // Nasr City, Cairo default until we have a fix
 
   L.tileLayer(
-    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
     {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       maxZoom: 19,
@@ -220,9 +222,9 @@ function initMap() {
 
   state.geofenceCircle = L.circle([30.0561, 31.3395], {
     radius: 200,
-    color: "#f2a53d",
+    color: "#D97706",
     weight: 1.5,
-    fillColor: "#f2a53d",
+    fillColor: "#D97706",
     fillOpacity: 0.08,
   });
 
@@ -335,7 +337,7 @@ async function loadHistory() {
 
 function updateCheckinButton() {
   const button = document.getElementById("checkin-button");
-  button.textContent = state.isCheckedIn ? "Check Out" : "Check In";
+  button.querySelector(".btn-label").textContent = state.isCheckedIn ? "Check Out" : "Check In";
   button.classList.toggle("checked-in", state.isCheckedIn);
 }
 
@@ -425,8 +427,7 @@ document.getElementById("checkin-button").addEventListener("click", async () => 
   }
 
   button.disabled = true;
-  const originalText = button.textContent;
-  button.textContent = "Submitting…";
+  button.classList.add("is-loading");
 
   try {
     const result = await Api.checkIn({
@@ -453,6 +454,7 @@ document.getElementById("checkin-button").addEventListener("click", async () => 
     showToast(err.message, "error");
   } finally {
     button.disabled = false;
+    button.classList.remove("is-loading");
     updateCheckinButton(); // loadHistory() already refreshed state.isCheckedIn
   }
 });
