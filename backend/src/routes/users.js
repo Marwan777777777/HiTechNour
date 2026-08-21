@@ -7,15 +7,29 @@ const { getMonthlyAttendance, resolveMonth, getDailyHours } = require("../utils/
 
 const router = express.Router();
 
-// Admin: list all employees/admins.
+// Admin: list users. By default only active employees+admins.
+// ?includeInactive=1 returns everyone. ?role=employee skips admins.
 router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
+    const includeInactive = req.query.includeInactive === "1" || req.query.includeInactive === "true";
+    const role = req.query.role; // optional: employee | admin
+    const clauses = [];
+    const params = [];
+    if (!includeInactive) {
+      clauses.push("active = true");
+    }
+    if (role === "employee" || role === "admin") {
+      params.push(role);
+      clauses.push(`role = $${params.length}`);
+    }
+    const where = clauses.length ? "WHERE " + clauses.join(" AND ") : "";
     const { rows } = await pool.query(
       `SELECT id, username, full_name, phone, role, title, active, locale,
               device_id IS NOT NULL AS device_approved,
               pending_device_id IS NOT NULL AND device_id IS NULL AS device_pending,
               device_bound_at, created_at
-       FROM users ORDER BY full_name`
+       FROM users ${where} ORDER BY full_name`,
+      params
     );
     res.json(rows);
   } catch (err) {
@@ -53,7 +67,6 @@ router.patch("/me", requireAuth, async (req, res, next) => {
 // Worker: delete own account (hard delete – irreversible)
 router.delete("/me", requireAuth, async (req, res, next) => {
   try {
-    // Prevent the last admin from deleting themselves
     if (req.user.role === "admin") {
       const { rows } = await pool.query(
         `SELECT COUNT(*)::int AS c FROM users WHERE role = 'admin' AND active = true`
@@ -70,10 +83,35 @@ router.delete("/me", requireAuth, async (req, res, next) => {
   }
 });
 
-// Admin: one worker's dashboard for a given month - attendance (days
-// present out of days in month), their assignments/tasks, and who they
-// worked alongside (teammates = other workers assigned to the same site
-// with overlapping dates). Powers the worker-detail view.
+// Admin: hard-delete a user (and cascade-related rows via FKs where set).
+// Prefer deactivate when possible; this is for cleaning test/duplicate accounts.
+router.delete("/:id", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const targetId = Number(req.params.id);
+    if (targetId === req.user.id) {
+      return res.status(400).json({ error: "You cannot delete your own account from here." });
+    }
+    const target = await pool.query("SELECT id, role, username FROM users WHERE id = $1", [targetId]);
+    if (!target.rows[0]) return res.status(404).json({ error: "User not found." });
+    if (target.rows[0].role === "admin") {
+      const { rows } = await pool.query(
+        `SELECT COUNT(*)::int AS c FROM users WHERE role = 'admin' AND active = true`
+      );
+      if (rows[0].c <= 1) {
+        return res.status(400).json({ error: "Cannot delete the last admin account." });
+      }
+    }
+    // Clean dependent rows that may not cascade
+    await pool.query("DELETE FROM worker_skills WHERE user_id = $1", [targetId]);
+    await pool.query("DELETE FROM assignments WHERE user_id = $1", [targetId]);
+    await pool.query("DELETE FROM notifications WHERE user_id = $1", [targetId]);
+    await pool.query("DELETE FROM users WHERE id = $1", [targetId]);
+    res.json({ ok: true, message: `Deleted ${target.rows[0].username}.` });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get("/:id/summary", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const userResult = await pool.query(
@@ -95,8 +133,6 @@ router.get("/:id/summary", requireAuth, requireAdmin, async (req, res, next) => 
       [req.params.id, start, end]
     );
 
-    // Teammates: anyone else assigned to the same site with a date range
-    // that overlaps this worker's assignment for the month.
     const teamResult = await pool.query(
       `SELECT DISTINCT u.id, u.full_name, u.username, s.name AS site_name
        FROM assignments a
@@ -139,8 +175,6 @@ router.get("/:id/summary", requireAuth, requireAdmin, async (req, res, next) => 
   }
 });
 
-// Admin: per-day hours worked this month - powers the worker drawer's
-// Monthly Report chart.
 router.get("/:id/daily", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const breakdown = await getDailyHours(req.params.id, req.query.month);
@@ -150,7 +184,6 @@ router.get("/:id/daily", requireAuth, requireAdmin, async (req, res, next) => {
   }
 });
 
-// Admin: create a new worker account.
 router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { username, password, fullName, phone, role } = req.body;
@@ -180,7 +213,6 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
   }
 });
 
-// Admin: update a worker's basic info / active status.
 router.patch("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { fullName, phone, active, role, title } = req.body;
@@ -202,9 +234,6 @@ router.patch("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   }
 });
 
-// Admin: approve a device that's pending (first-time binding, done in
-// person or over a call so the admin actually confirms it's the real
-// employee's phone - closes the "attacker binds first" race condition).
 router.post("/:id/approve-device", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -217,7 +246,6 @@ router.post("/:id/approve-device", requireAuth, requireAdmin, async (req, res, n
       return res.status(400).json({ error: "No pending device to approve for this user." });
     }
 
-    // Notify the worker that their device is approved
     await pool.query(
       `INSERT INTO notifications (user_id, title, body, kind)
        VALUES ($1, $2, $3, $4)`,
@@ -230,8 +258,6 @@ router.post("/:id/approve-device", requireAuth, requireAdmin, async (req, res, n
   }
 });
 
-// Admin: reset a worker's bound device (lost/replaced phone). Clears both
-// the approved and pending device so they register fresh on next check-in.
 router.post("/:id/reset-device", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -247,10 +273,6 @@ router.post("/:id/reset-device", requireAuth, requireAdmin, async (req, res, nex
   }
 });
 
-// Admin: force-logout a worker on every device (lost/stolen phone). Bumps
-// token_version so their existing token is rejected on their very next
-// request - no need to wait a year for it to expire naturally, and no need
-// to disable the whole account just to kill one bad session.
 router.post("/:id/force-logout", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -264,7 +286,6 @@ router.post("/:id/force-logout", requireAuth, requireAdmin, async (req, res, nex
   }
 });
 
-// Admin: reset a worker's password (they forgot it / it was compromised).
 router.post("/:id/reset-password", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { newPassword } = req.body;
