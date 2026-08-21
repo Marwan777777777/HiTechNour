@@ -56,11 +56,12 @@ window.addEventListener("DOMContentLoaded", async () => {
 // Api.me() throws) or every retry truly fails.
 async function bootWithRetry(attempt = 1) {
   const maxAttempts = 4;
+  const stayClassic = new URLSearchParams(location.search).get("classic") === "1";
   try {
     const me = await Api.me();
     document.getElementById("boot-screen").classList.add("hidden");
     hideReconnectBanner();
-    if (me.role === "admin") {
+    if (me.role === "admin" && !stayClassic) {
       window.location.href = "admin.html";
       return;
     } else {
@@ -117,7 +118,8 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
     const result = await Api.login(username, password);
     Auth.setToken(result.token);
     Auth.setUser(result.user);
-    if (result.user.role === "admin") {
+    const stayClassic = new URLSearchParams(location.search).get("classic") === "1";
+    if (result.user.role === "admin" && !stayClassic) {
       window.location.href = "admin.html";
       return;
     } else {
