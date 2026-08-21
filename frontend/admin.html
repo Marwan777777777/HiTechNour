@@ -1,773 +1,406 @@
-// ---- Auth guard ----
-// This page is only for admins. A worker landing here (bad link, stale
-// bookmark) gets bounced straight back to the regular app instead of
-// seeing a broken dashboard.
-//
-// Important: a slept/cold-starting backend (Railway free tier, a sleeping
-// Neon DB) can make Api.me() fail or time out for reasons that have
-// nothing to do with who's logged in. Treating every failure as "not an
-// admin" causes a redirect ping-pong with index.html's own retry logic
-// (index.html retries, succeeds, sends us back here; we hit another
-// transient hiccup, bounce again). Only a genuine 401 - which apiRequest
-// already reacts to by clearing the stored token - should count as
-// "not authorized." Anything else gets retried instead.
-(async function guard(attempt = 1) {
-  const maxAttempts = 4;
-  const token = Auth.getToken();
-  if (!token) {
-    window.location.href = "index.html";
-    return;
-  }
-  try {
-    const me = await Api.me();
-    if (me.role !== "admin") {
-      window.location.href = "index.html";
-      return;
-    }
-    Auth.setUser(me);
-    document.getElementById("footerName").textContent = me.fullName || me.username;
-    document.getElementById("footerAvatar").textContent = initials(me.fullName || me.username);
-    boot();
-  } catch (err) {
-    // apiRequest's 401 branch already clears the token on a real auth
-    // failure - if it's gone, this genuinely isn't a logged-in admin.
-    if (!Auth.getToken()) {
-      window.location.href = "index.html";
-      return;
-    }
-    if (attempt >= maxAttempts) {
-      // Give up gracefully instead of looping forever - send them back to
-      // index.html once, which has its own reconnect banner for a truly
-      // unreachable server, rather than flashing between pages.
-      window.location.href = "index.html";
-      return;
-    }
-    setTimeout(() => guard(attempt + 1), attempt * 1500);
-  }
-})();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HighTechNour — Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/admin-dashboard.css" />
+</head>
+<body>
 
-function initials(name) {
-  return (name || "?")
-    .split(" ")
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
+<div class="app">
 
-function showToast(message, kind = "") {
-  const toast = document.getElementById("toast");
-  toast.textContent = message;
-  toast.className = "toast" + (kind ? ` toast-${kind}` : "");
-  toast.classList.remove("hidden");
-  setTimeout(() => toast.classList.add("hidden"), 3200);
-}
+  <div class="sidebar-scrim" id="sidebarScrim"></div>
 
-// ---- Boot ----
-let state = { overview: null, team: null, feed: null };
-let charts = {};
-
-function boot() {
-  document.getElementById("topbarDate").textContent = new Date().toLocaleDateString(undefined, {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-
-  document.querySelectorAll(".nav-item[data-page]").forEach((item) => {
-    item.addEventListener("click", () => {
-      showPage(item.dataset.page);
-      closeSidebarOnMobile();
-    });
-  });
-
-  document.getElementById("logoutFooter").addEventListener("click", () => {
-    Auth.logout();
-    window.location.href = "index.html";
-  });
-
-  document.getElementById("menuBtn").addEventListener("click", () => {
-    document.getElementById("sidebar").classList.toggle("open");
-    document.getElementById("sidebarScrim").classList.toggle("open");
-  });
-  document.getElementById("sidebarScrim").addEventListener("click", closeSidebarOnMobile);
-
-  document.getElementById("refreshBtn").addEventListener("click", () => {
-    loadOverview();
-    if (state.team) loadTeam();
-    if (state.feed) loadActivityFeed();
-  });
-
-  document.getElementById("drawerCloseBtn").addEventListener("click", closeDrawer);
-  document.getElementById("drawerOverlay").addEventListener("click", (e) => {
-    if (e.target.id === "drawerOverlay") closeDrawer();
-  });
-  document.querySelectorAll(".tab[data-tab]").forEach((tab) => {
-    tab.addEventListener("click", () => switchTab(tab.dataset.tab));
-  });
-
-  document.getElementById("feedSearch").addEventListener("input", renderFeed);
-
-  // ---- Add Worker ----
-  document.getElementById("openAddWorkerBtn").addEventListener("click", openAddWorkerModal);
-  document.getElementById("addWorkerCloseBtn").addEventListener("click", closeAddWorkerModal);
-  document.getElementById("addWorkerOverlay").addEventListener("click", (e) => {
-    if (e.target.id === "addWorkerOverlay") closeAddWorkerModal();
-  });
-  document.getElementById("addWorkerForm").addEventListener("submit", handleAddWorkerSubmit);
-
-  loadOverview();
-}
-
-function openAddWorkerModal() {
-  document.getElementById("addWorkerForm").reset();
-  document.getElementById("addWorkerError").classList.add("hidden");
-  document.getElementById("addWorkerOverlay").classList.add("open");
-}
-
-function closeAddWorkerModal() {
-  document.getElementById("addWorkerOverlay").classList.remove("open");
-}
-
-async function handleAddWorkerSubmit(e) {
-  e.preventDefault();
-  const errorEl = document.getElementById("addWorkerError");
-  const submitBtn = document.getElementById("addWorkerSubmitBtn");
-  errorEl.classList.add("hidden");
-
-  const fullName = document.getElementById("awFullName").value.trim();
-  const username = document.getElementById("awUsername").value.trim();
-  const password = document.getElementById("awPassword").value;
-  const phone = document.getElementById("awPhone").value.trim();
-  const role = document.getElementById("awRole").value;
-
-  if (password.length < 8) {
-    errorEl.textContent = "Password must be at least 8 characters.";
-    errorEl.classList.remove("hidden");
-    return;
-  }
-
-  submitBtn.disabled = true;
-  submitBtn.textContent = "Adding…";
-  try {
-    await Api.createUser({ username, password, fullName, phone: phone || undefined, role });
-    showToast(`${fullName} added.`, "success");
-    closeAddWorkerModal();
-    state.team = null; // force a refresh next time Team is opened
-    if (document.getElementById("page-team").classList.contains("active")) loadTeam();
-  } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.classList.remove("hidden");
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = "Add Worker";
-  }
-}
-
-function closeSidebarOnMobile() {
-  document.getElementById("sidebar").classList.remove("open");
-  document.getElementById("sidebarScrim").classList.remove("open");
-}
-
-const pageTitles = {
-  overview: "Overview",
-  attendance: "Attendance",
-  team: "Team",
-  sites: "Sites",
-  leave: "Days Off",
-  skills: "Skills",
-  anomalies: "Anomalies",
-  activityfeed: "Activity Feed",
-  reports: "Reports",
-  devices: "Devices",
-  settings: "Settings",
-};
-
-function showPage(name) {
-  document.querySelectorAll(".nav-item[data-page]").forEach((n) => n.classList.toggle("active", n.dataset.page === name));
-  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + name));
-  document.getElementById("pageTitle").textContent = pageTitles[name] || name;
-
-  if (name === "team" && !state.team) loadTeam();
-  if (name === "attendance" && !state.attendance) loadAttendanceLog();
-  if (name === "devices") loadDevices();
-  if (name === "activityfeed" && !state.feed) loadActivityFeed();
-  if (name === "anomalies") loadAnomaliesFull();
-}
-
-// ---- Devices ----
-async function loadDevices() {
-  const tbody = document.getElementById("devTableBody");
-  try {
-    state.devices = await Api.getUsers();
-    renderDevices();
-  } catch (err) {
-    tbody.innerHTML = "";
-    document.getElementById("devEmpty").textContent = err.message;
-    document.getElementById("devEmpty").classList.remove("hidden");
-  }
-}
-
-function deviceStatusMeta(u) {
-  if (u.device_pending) return { label: "Pending approval", cls: "status-late" };
-  if (u.device_approved) return { label: "Approved", cls: "status-present" };
-  return { label: "No device registered", cls: "status-absent" };
-}
-
-function renderDevices() {
-  if (!state.devices) return;
-  const search = (document.getElementById("devSearch").value || "").toLowerCase();
-  let rows = state.devices;
-  if (search) rows = rows.filter((u) => u.full_name.toLowerCase().includes(search));
-
-  const pendingCount = state.devices.filter((u) => u.device_pending).length;
-  const badge = document.getElementById("devPendingBadge");
-  if (pendingCount > 0) {
-    badge.textContent = `${pendingCount} pending`;
-    badge.classList.remove("hidden");
-  } else {
-    badge.classList.add("hidden");
-  }
-
-  const tbody = document.getElementById("devTableBody");
-  const empty = document.getElementById("devEmpty");
-  if (!rows.length) {
-    tbody.innerHTML = "";
-    empty.classList.remove("hidden");
-    return;
-  }
-  empty.classList.add("hidden");
-
-  tbody.innerHTML = rows
-    .map((u) => {
-      const meta = deviceStatusMeta(u);
-      const bound = u.device_bound_at ? new Date(u.device_bound_at).toLocaleDateString() : "—";
-      let actions = "";
-      if (u.device_pending) {
-        actions += `<button class="secondary-button" style="margin:0 6px 0 0;" data-approve="${u.id}">Approve</button>`;
-      }
-      if (u.device_approved || u.device_pending) {
-        actions += `<button class="secondary-button" style="margin:0 6px 0 0;" data-reset="${u.id}">Reset</button>`;
-      }
-      actions += `<button class="secondary-button" style="margin:0;color:var(--red);border-color:#f3c9c9;" data-logout="${u.id}" data-name="${u.full_name}">Force Sign-out</button>`;
-      return `
-      <tr>
-        <td class="name-cell"><div class="avatar-sm">${initials(u.full_name)}</div>${u.full_name}</td>
-        <td><span class="status-pill ${meta.cls}">${meta.label}</span></td>
-        <td class="mono">${bound}</td>
-        <td style="white-space:nowrap;">${actions}</td>
-      </tr>`;
-    })
-    .join("");
-
-  tbody.querySelectorAll("[data-approve]").forEach((btn) =>
-    btn.addEventListener("click", async () => {
-      try {
-        await Api.approveDevice(btn.dataset.approve);
-        showToast("Device approved.", "success");
-        await loadDevices();
-      } catch (err) {
-        showToast(err.message, "error");
-      }
-    })
-  );
-  tbody.querySelectorAll("[data-reset]").forEach((btn) =>
-    btn.addEventListener("click", async () => {
-      if (!confirm("Reset this worker's bound device? They'll need re-approval on their next check-in.")) return;
-      try {
-        await Api.resetDevice(btn.dataset.reset);
-        showToast("Device binding reset.", "success");
-        await loadDevices();
-      } catch (err) {
-        showToast(err.message, "error");
-      }
-    })
-  );
-  tbody.querySelectorAll("[data-logout]").forEach((btn) =>
-    btn.addEventListener("click", async () => {
-      if (!confirm(`Sign out ${btn.dataset.name} on every device? They'll need to log in again next time.`)) return;
-      try {
-        await Api.forceLogout(btn.dataset.logout);
-        showToast(`${btn.dataset.name} signed out on all devices.`, "success");
-      } catch (err) {
-        showToast(err.message, "error");
-      }
-    })
-  );
-}
-
-document.getElementById("devSearch").addEventListener("input", renderDevices);
-
-// ---- Attendance (full log) ----
-async function loadAttendanceLog() {
-  const tbody = document.getElementById("attTableBody");
-  try {
-    const [checkins, sites] = await Promise.all([Api.getAllCheckins(), Api.getSites()]);
-    state.attendance = checkins;
-
-    const siteFilter = document.getElementById("attSiteFilter");
-    siteFilter.innerHTML =
-      '<option value="">All sites</option>' +
-      sites.map((s) => `<option value="${s.name}">${s.name}</option>`).join("");
-
-    renderAttendanceLog();
-  } catch (err) {
-    tbody.innerHTML = "";
-    document.getElementById("attEmpty").textContent = err.message;
-    document.getElementById("attEmpty").classList.remove("hidden");
-  }
-}
-
-function renderAttendanceLog() {
-  if (!state.attendance) return;
-  const start = document.getElementById("attStart").value;
-  const end = document.getElementById("attEnd").value;
-  const site = document.getElementById("attSiteFilter").value;
-  const search = (document.getElementById("attSearch").value || "").toLowerCase();
-  const flaggedOnly = document.getElementById("attFlaggedOnly").classList.contains("is-active");
-
-  let rows = state.attendance;
-  if (start) rows = rows.filter((r) => r.created_at.slice(0, 10) >= start);
-  if (end) rows = rows.filter((r) => r.created_at.slice(0, 10) <= end);
-  if (site) rows = rows.filter((r) => r.site_name === site);
-  if (search) rows = rows.filter((r) => r.full_name.toLowerCase().includes(search));
-  if (flaggedOnly) rows = rows.filter((r) => r.flagged);
-
-  const tbody = document.getElementById("attTableBody");
-  const empty = document.getElementById("attEmpty");
-  document.getElementById("attCount").textContent = `${rows.length} of ${state.attendance.length}${state.attendance.length >= 500 ? "+ (showing most recent 500)" : ""}`;
-
-  if (!rows.length) {
-    tbody.innerHTML = "";
-    empty.classList.remove("hidden");
-    return;
-  }
-  empty.classList.add("hidden");
-
-  tbody.innerHTML = rows
-    .map((r) => {
-      const statusLabel = r.flagged && !r.reviewed ? "flagged" : r.status;
-      const statusClass = r.flagged && !r.reviewed ? "status-late" : r.status === "inside" ? "status-inside" : "status-outside";
-      return `
-      <tr class="row-click" data-worker-id="${r.user_id || ""}">
-        <td class="name-cell"><div class="avatar-sm">${initials(r.full_name)}</div>${r.full_name}</td>
-        <td>${r.site_name}</td>
-        <td class="mono">${r.type === "check_in" ? "IN" : "OUT"}</td>
-        <td class="mono">${new Date(r.created_at).toLocaleString()}</td>
-        <td class="mono">${r.distance_meters != null ? Math.round(r.distance_meters) + "m" : "—"}</td>
-        <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
-      </tr>`;
-    })
-    .join("");
-
-  tbody.querySelectorAll("[data-worker-id]").forEach((tr) => {
-    if (tr.dataset.workerId) tr.addEventListener("click", () => openWorkerDrawer(tr.dataset.workerId));
-  });
-}
-
-["attStart", "attEnd", "attSiteFilter", "attSearch"].forEach((id) => {
-  document.getElementById(id).addEventListener("input", renderAttendanceLog);
-});
-
-document.getElementById("attFlaggedOnly").addEventListener("click", (e) => {
-  e.target.classList.toggle("is-active");
-  e.target.style.background = e.target.classList.contains("is-active") ? "var(--red-wash)" : "#fff";
-  e.target.style.color = e.target.classList.contains("is-active") ? "var(--red)" : "var(--ink-dim)";
-  e.target.style.borderColor = e.target.classList.contains("is-active") ? "var(--red)" : "var(--line-strong)";
-  renderAttendanceLog();
-});
-
-document.getElementById("attExportBtn").addEventListener("click", async () => {
-  const start = document.getElementById("attStart").value;
-  const end = document.getElementById("attEnd").value;
-  if (!start || !end) {
-    showToast("Pick a From and To date first.", "error");
-    return;
-  }
-  const btn = document.getElementById("attExportBtn");
-  const original = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "Preparing…";
-  try {
-    const blob = await Api.exportCsv(start, end);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "HTN_Attendance_Report.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    showToast(err.message, "error");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = original;
-  }
-});
-
-// ---- Overview ----
-async function loadOverview() {
-  try {
-    const data = await Api.getOverview();
-    state.overview = data;
-
-    document.getElementById("kpiTotal").textContent = data.totalWorkers;
-    document.getElementById("kpiTotalSub").textContent = "Across your sites";
-    document.getElementById("kpiPresent").textContent = data.presentToday;
-    document.getElementById("kpiPresentSub").textContent = data.totalWorkers
-      ? `${Math.round((data.presentToday / data.totalWorkers) * 100)}% of total`
-      : "—";
-    document.getElementById("kpiLate").textContent = data.lateToday;
-    document.getElementById("kpiLateSub").textContent = data.totalWorkers
-      ? `${Math.round((data.lateToday / data.totalWorkers) * 100)}% of total`
-      : "—";
-    document.getElementById("kpiAbsent").textContent = data.absentToday;
-    document.getElementById("kpiAbsentSub").textContent = data.totalWorkers
-      ? `${Math.round((data.absentToday / data.totalWorkers) * 100)}% of total`
-      : "—";
-
-    renderAttendanceChart(data.weekly);
-    renderSiteDonut(data.bySite);
-    renderRecentAttendance(data.recentAttendance);
-    renderReviewQueue(data.reviewQueue);
-
-    const badge = document.getElementById("anomaliesBadge");
-    if (data.reviewQueue.length > 0) {
-      badge.textContent = data.reviewQueue.length;
-      badge.classList.remove("hidden");
-    } else {
-      badge.classList.add("hidden");
-    }
-  } catch (err) {
-    showToast(err.message, "error");
-  }
-}
-
-function renderAttendanceChart(weekly) {
-  const ctx = document.getElementById("attendanceChart");
-  if (charts.attendance) charts.attendance.destroy();
-  charts.attendance = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: weekly.map((d) => d.date.slice(5)),
-      datasets: [
-        { label: "Present", data: weekly.map((d) => d.present), borderColor: "#16A34A", backgroundColor: "rgba(22,163,74,0.08)", tension: 0.4, fill: true, pointRadius: 3 },
-        { label: "Late", data: weekly.map((d) => d.late), borderColor: "#D97706", backgroundColor: "rgba(217,119,6,0.06)", tension: 0.4, fill: true, pointRadius: 3 },
-        { label: "Absent", data: weekly.map((d) => d.absent), borderColor: "#DC2626", backgroundColor: "rgba(220,38,38,0.06)", tension: 0.4, fill: true, pointRadius: 3 },
-      ],
-    },
-    options: {
-      plugins: { legend: { position: "top", align: "end", labels: { usePointStyle: true, boxWidth: 7, font: { size: 11.5, family: "Inter" } } } },
-      scales: { y: { grid: { color: "#EEF1F7" }, ticks: { font: { size: 11 } } }, x: { grid: { display: false }, ticks: { font: { size: 11 } } } },
-      interaction: { intersect: false },
-    },
-  });
-}
-
-function renderSiteDonut(bySite) {
-  const ctx = document.getElementById("siteDonut");
-  if (charts.donut) charts.donut.destroy();
-  const colors = ["#2557D6", "#7C5CFC", "#D97706", "#16A34A", "#DC2626", "#94A0B8"];
-  if (!bySite.length) {
-    document.getElementById("siteDonutLegend").innerHTML = `<div class="empty-note" style="padding:0;">No check-ins yet today.</div>`;
-    charts.donut = new Chart(ctx, { type: "doughnut", data: { labels: ["No data"], datasets: [{ data: [1], backgroundColor: ["#EEF1F7"], borderWidth: 0 }] }, options: { cutout: "68%", plugins: { legend: { display: false }, tooltip: { enabled: false } } } });
-    return;
-  }
-  charts.donut = new Chart(ctx, {
-    type: "doughnut",
-    data: { labels: bySite.map((s) => s.name), datasets: [{ data: bySite.map((s) => s.count), backgroundColor: colors, borderWidth: 0 }] },
-    options: { cutout: "68%", plugins: { legend: { display: false } } },
-  });
-  document.getElementById("siteDonutLegend").innerHTML = bySite
-    .map(
-      (s, i) => `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;">
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colors[i % colors.length]};margin-right:6px;"></span>${s.name}</span><b>${s.count}</b>
-      </div>`
-    )
-    .join("");
-}
-
-function fmtTime(ts) {
-  if (!ts) return "—";
-  return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function statusPillClass(status) {
-  return { present: "status-present", late: "status-late", absent: "status-absent", completed: "status-completed" }[status] || "status-present";
-}
-
-function renderRecentAttendance(rows) {
-  const table = document.getElementById("recentAttendanceTable");
-  const empty = document.getElementById("recentAttendanceEmpty");
-  table.innerHTML = "<tr><th>Worker</th><th>Site</th><th>Check In</th><th>Check Out</th><th>Status</th></tr>";
-  if (!rows.length) {
-    empty.classList.remove("hidden");
-    return;
-  }
-  empty.classList.add("hidden");
-  rows.forEach((r) => {
-    const tr = document.createElement("tr");
-    tr.className = "row-click";
-    tr.addEventListener("click", () => openWorkerDrawer(r.userId));
-    tr.innerHTML = `
-      <td class="name-cell"><div class="avatar-sm">${initials(r.fullName)}</div>${r.fullName}</td>
-      <td>${r.siteName || "—"}</td>
-      <td class="mono">${fmtTime(r.checkInAt)}</td>
-      <td class="mono">${fmtTime(r.checkOutAt)}</td>
-      <td><span class="status-pill ${statusPillClass(r.status)}">${r.status}</span></td>
-    `;
-    table.appendChild(tr);
-  });
-}
-
-function renderReviewQueue(items) {
-  const body = document.getElementById("reviewQueueBody");
-  if (!items.length) {
-    body.innerHTML = `<div class="empty-note">Nothing flagged right now.</div>`;
-    return;
-  }
-  body.innerHTML = items
-    .map(
-      (i) => `
-    <div class="queue-item">
-      <div class="queue-icon" style="background:var(--red-wash);color:var(--red);">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/></svg>
+  <!-- ================= SIDEBAR ================= -->
+  <div class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">H</div>
+      <div>
+        <div class="brand-name">HIGHTECHNOUR</div>
+        <div class="brand-sub">Attendance</div>
       </div>
-      <div><div class="queue-title">${(i.flag_reason || "flagged").replace(/_/g, " ")}</div><div class="queue-sub">${i.full_name} · ${i.site_name}</div></div>
-      <div class="queue-time">${fmtTime(i.created_at)}</div>
-    </div>`
-    )
-    .join("");
-}
+    </div>
 
-async function loadAnomaliesFull() {
-  const body = document.getElementById("anomaliesFullBody");
-  try {
-    const all = await Api.getAllCheckins();
-    const flagged = all.filter((c) => c.flagged && !c.reviewed);
-    body.innerHTML = flagged.length
-      ? flagged
-          .map(
-            (i) => `
-      <div class="queue-item">
-        <div class="queue-icon" style="background:var(--red-wash);color:var(--red);">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/></svg>
+    <div class="nav-group">
+      <div class="nav-item active" data-page="overview">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Overview
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Operations</div>
+      <div class="nav-item" data-page="attendance">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Attendance
+      </div>
+      <div class="nav-item" data-page="team">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team
+      </div>
+      <div class="nav-item" data-page="sites">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        Sites
+      </div>
+      <div class="nav-item" data-page="leave">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9h18"/></svg>
+        Days Off
+      </div>
+      <div class="nav-item" data-page="skills">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 6.9L21 9l-5.5 4.6L17.4 21 12 17l-5.4 4 1.9-7.4L3 9l6.6-.1z"/></svg>
+        Skills
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Analytics</div>
+      <div class="nav-item" data-page="anomalies">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+        Anomalies
+        <span class="nav-badge hidden" id="anomaliesBadge">0</span>
+      </div>
+      <div class="nav-item" data-page="activityfeed">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Activity Feed
+      </div>
+      <div class="nav-item" data-page="reports">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/></svg>
+        Reports
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">System</div>
+      <div class="nav-item" data-page="devices">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+        Devices
+      </div>
+      <div class="nav-item" data-page="settings">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </div>
+    </div>
+
+    <div class="sidebar-footer" id="logoutFooter" title="Sign out">
+      <div class="avatar-sm" id="footerAvatar">A</div>
+      <div>
+        <div class="footer-name" id="footerName">Admin</div>
+        <div class="footer-role">Sign out</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MAIN ================= -->
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="menu-btn" id="menuBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <div class="topbar-title">
+          <h1 id="pageTitle">Overview</h1>
+          <span>·</span>
+          <span id="topbarDate"></span>
         </div>
-        <div><div class="queue-title">${(i.flag_reason || "flagged").replace(/_/g, " ")}</div><div class="queue-sub">${i.full_name} · ${i.site_name}</div></div>
-        <div class="queue-time">${new Date(i.created_at).toLocaleString()}</div>
-      </div>`
-          )
-          .join("")
-      : `<div class="empty-note">Nothing flagged right now.</div>`;
-  } catch (err) {
-    body.innerHTML = `<div class="empty-note">${err.message}</div>`;
-  }
-}
+      </div>
+      <div class="topbar-right">
+        <div class="icon-btn" id="refreshBtn" title="Refresh">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </div>
+      </div>
+    </div>
 
-// ---- Team ----
-async function loadTeam() {
-  const wrap = document.getElementById("teamBySite");
-  try {
-    const sites = await Api.getTeamBySite();
-    state.team = sites;
-    wrap.innerHTML = sites
-      .map((site) => {
-        const rows = site.members
-          .map((m) => {
-            const skillChips = m.skills.slice(0, 3).map((s) => `<span class="skill-chip">${s.name}</span>`).join("");
-            const attStatus = m.attendancePct >= 90 ? "status-present" : m.attendancePct >= 80 ? "status-late" : "status-absent";
-            return `
-          <tr class="row-click" data-worker-id="${m.id}">
-            <td class="name-cell"><div class="avatar-sm">${initials(m.fullName)}</div><div><div class="name-main">${m.fullName}</div><div class="name-sub">${m.title || skillChips || "—"}</div></div></td>
-            <td>${skillChips || "<span style='color:var(--ink-faint)'>—</span>"}</td>
-            <td><span class="status-pill ${attStatus}">${m.attendancePct}%</span></td>
-            <td><span class="link-btn">View →</span></td>
-          </tr>`;
-          })
-          .join("");
-        return `
-        <div class="site-group" style="margin-bottom:20px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 4px 10px;">
-            <div style="font-weight:700;font-size:13.5px;">${site.siteName}</div>
-            <div style="font-size:11.5px;color:var(--ink-faint);font-weight:600;">${site.members.length} worker${site.members.length === 1 ? "" : "s"}</div>
+    <div class="content">
+
+      <!-- ============ OVERVIEW PAGE ============ -->
+      <div class="page active" id="page-overview">
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:var(--blue-wash);color:var(--blue);">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              </div>
+              <div class="kpi-label">Total Workers</div>
+            </div>
+            <div class="kpi-value" id="kpiTotal">—</div>
+            <div class="kpi-sub" id="kpiTotalSub">&nbsp;</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:var(--green-wash);color:var(--green);">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+              </div>
+              <div class="kpi-label">Present Today</div>
+            </div>
+            <div class="kpi-value" id="kpiPresent">—</div>
+            <div class="kpi-sub" id="kpiPresentSub">&nbsp;</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:var(--amber-wash);color:var(--amber);">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+              </div>
+              <div class="kpi-label">Late</div>
+            </div>
+            <div class="kpi-value" id="kpiLate">—</div>
+            <div class="kpi-sub" id="kpiLateSub">&nbsp;</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:var(--red-wash);color:var(--red);">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+              </div>
+              <div class="kpi-label">Absent</div>
+            </div>
+            <div class="kpi-value" id="kpiAbsent">—</div>
+            <div class="kpi-sub" id="kpiAbsentSub">&nbsp;</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><h3>Attendance Overview — Last 6 Days</h3></div>
+            <div class="panel-body"><canvas id="attendanceChart" height="150"></canvas></div>
           </div>
           <div class="panel">
-            <div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;">
-              <table>
-                <tr><th>Worker</th><th>Skills</th><th>Attendance (month)</th><th></th></tr>
-                ${rows}
-              </table>
+            <div class="panel-head"><h3>Attendance by Site — Today</h3></div>
+            <div class="panel-body" style="display:flex;gap:14px;align-items:center;">
+              <canvas id="siteDonut" width="120" height="120" style="flex-shrink:0;"></canvas>
+              <div style="flex:1;" id="siteDonutLegend"></div>
             </div>
           </div>
-        </div>`;
-      })
-      .join("");
+        </div>
 
-    wrap.querySelectorAll("[data-worker-id]").forEach((tr) => {
-      tr.addEventListener("click", () => openWorkerDrawer(tr.dataset.workerId));
-    });
-  } catch (err) {
-    wrap.innerHTML = `<div class="empty-note">${err.message}</div>`;
-  }
-}
-
-// ---- Activity Feed ----
-async function loadActivityFeed() {
-  try {
-    state.feed = await Api.getAllCheckins();
-    renderFeed();
-  } catch (err) {
-    document.getElementById("feedBody").innerHTML = `<div class="empty-note">${err.message}</div>`;
-  }
-}
-
-function renderFeed() {
-  if (!state.feed) return;
-  const filter = (document.getElementById("feedSearch").value || "").toLowerCase();
-  let rows = state.feed;
-  if (filter) rows = rows.filter((r) => r.full_name.toLowerCase().includes(filter));
-
-  document.getElementById("feedBody").innerHTML = rows.length
-    ? rows
-        .slice(0, 200)
-        .map((a) => {
-          const pretty = new Date(a.created_at).toLocaleString();
-          return `<div class="log-line">
-        <div class="log-time mono">${pretty}</div>
-        <div class="log-type ${a.type === "check_in" ? "in" : "out"} mono">${a.type === "check_in" ? "IN" : "OUT"}</div>
-        <div><div class="log-detail"><b>${a.full_name}</b> — ${a.site_name} <span class="status-pill status-${a.status}" style="font-size:10px;padding:1px 6px;">${a.status}</span></div><div class="log-loc mono">${a.distance_meters != null ? Math.round(a.distance_meters) + "m from center" : ""}</div></div>
-      </div>`;
-        })
-        .join("")
-    : `<div class="empty-note">No matching activity.</div>`;
-}
-
-// ---- Worker drawer ----
-let monthlyChartInstance = null;
-let currentDrawerWorker = null;
-
-async function openWorkerDrawer(userId) {
-  currentDrawerWorker = userId;
-  document.getElementById("drawerOverlay").classList.add("open");
-  switchTab("overview");
-
-  try {
-    const [summary, daily] = await Promise.all([Api.workerSummary(userId), Api.getWorkerDaily(userId)]);
-    const { user, attendance, tasks, teammates, skills } = summary;
-
-    document.getElementById("dwAvatar").textContent = initials(user.fullName);
-    document.getElementById("dwName").textContent = user.fullName;
-    document.getElementById("dwRole").textContent = user.title || (user.role === "admin" ? "Admin" : "Worker");
-    document.getElementById("dwAttendance").textContent = attendance.daysInMonth
-      ? Math.round((attendance.daysPresent / attendance.daysInMonth) * 100) + "%"
-      : "—";
-    document.getElementById("dwDaysOff").textContent = "—";
-    document.getElementById("dwSites").textContent = new Set(tasks.map((t) => t.site_name)).size;
-    document.getElementById("dwPhone").textContent = user.phone || "—";
-    document.getElementById("dwUsername").textContent = user.username;
-
-    document.getElementById("dwSkills").innerHTML = skills.length
-      ? skills
-          .map(
-            (s) => `<div class="skill-row"><div class="skill-name">${s.name}</div><div class="skill-dots">${[1, 2, 3, 4, 5].map((n) => `<span class="${n <= s.level ? "on" : ""}"></span>`).join("")}</div></div>`
-          )
-          .join("")
-      : `<div class="empty-note">No skills tagged yet.</div>`;
-
-    document.getElementById("tab-sitelog").innerHTML = tasks.length
-      ? tasks
-          .map((t) => {
-            const teamHere = teammates.filter((tm) => tm.site_name === t.site_name);
-            const teamChips = teamHere.map((tm) => `<span class="team-chip"><span class="dot-av">${initials(tm.full_name)}</span>${tm.full_name}</span>`).join("");
-            return `
-        <div class="site-visit">
-          <div class="sv-top"><div class="sv-site">${t.site_name}</div><div class="sv-date">${t.start_date} → ${t.end_date}</div></div>
-          ${teamChips ? `<div class="sv-team">${teamChips}</div>` : ""}
-          ${t.task ? `<div class="sv-task">${t.task}</div>` : ""}
-        </div>`;
-          })
-          .join("")
-      : `<div class="empty-note">No assignments this month.</div>`;
-
-    const workerActivity = (state.feed || []).filter((a) => a.username === user.username).slice(0, 40);
-    document.getElementById("tab-activity").innerHTML = workerActivity.length
-      ? `<div class="panel"><div class="panel-body">` +
-        workerActivity
-          .map(
-            (a) => `<div class="log-line">
-          <div class="log-time mono">${new Date(a.created_at).toLocaleString()}</div>
-          <div class="log-type ${a.type === "check_in" ? "in" : "out"} mono">${a.type === "check_in" ? "IN" : "OUT"}</div>
-          <div><div class="log-detail">${a.site_name} <span class="status-pill status-${a.status}" style="font-size:10px;padding:1px 6px;">${a.status}</span></div></div>
-        </div>`
-          )
-          .join("") +
-        `</div></div>`
-      : `<div class="empty-note">Open the Activity Feed page once to load recent activity, then reopen this worker.</div>`;
-
-    renderMonthlyReport(daily, attendance);
-  } catch (err) {
-    showToast(err.message, "error");
-  }
-}
-
-function renderMonthlyReport(daily, attendance) {
-  const present = daily.days.filter((d) => d.hours > 0).length;
-  const absent = daily.daysInMonth - present;
-  const totalHours = daily.days.reduce((s, d) => s + d.hours, 0);
-
-  document.getElementById("tab-monthly").innerHTML = `
-    <div class="report-stats">
-      <div class="rstat"><div class="rstat-val">${totalHours.toFixed(1)}h</div><div class="rstat-label">Total Hours</div></div>
-      <div class="rstat"><div class="rstat-val">${present}</div><div class="rstat-label">Present Days</div></div>
-      <div class="rstat"><div class="rstat-val">${absent}</div><div class="rstat-label">Absent Days</div></div>
-      <div class="rstat"><div class="rstat-val">${attendance.daysInMonth}</div><div class="rstat-label">Days This Month</div></div>
-    </div>
-    <div class="panel" style="margin-bottom:14px;">
-      <div class="panel-head"><h3>Daily Hours — ${daily.month}</h3></div>
-      <div class="panel-body"><canvas id="monthlyChart" height="110"></canvas></div>
-    </div>
-    <div class="panel">
-      <div class="panel-head"><h3>Payroll Estimate</h3></div>
-      <div class="rate-field">
-        <label>Daily rate (EGP)</label>
-        <input type="number" id="payRate" value="350" min="0" oninput="updatePayTotal(${present})" />
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Recent Attendance — Today</h3>
+              <span class="link-btn" onclick="showPage('team')">View all</span>
+            </div>
+            <div class="panel-body" style="padding:0 18px 8px;">
+              <table id="recentAttendanceTable">
+                <tr><th>Worker</th><th>Site</th><th>Check In</th><th>Check Out</th><th>Status</th></tr>
+              </table>
+              <div class="empty-note hidden" id="recentAttendanceEmpty">No check-ins yet today.</div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Review Queue</h3>
+              <span class="link-btn" onclick="showPage('anomalies')">View all</span>
+            </div>
+            <div class="panel-body" id="reviewQueueBody">
+              <div class="empty-note">Nothing flagged. Loading…</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="payroll-box" style="border:none;border-radius:0;">
-        <div class="payroll-row"><span>Present days (${present} × rate)</span><span class="mono">full pay</span></div>
-        <div class="payroll-row"><span>Absent days (${absent})</span><span class="mono">unpaid</span></div>
-        <div class="payroll-row total"><span>Estimated pay — ${present} payable days</span><span class="mono" id="payTotal">EGP ${(present * 350).toLocaleString()}</span></div>
+
+      <!-- ============ TEAM PAGE ============ -->
+      <div class="page" id="page-team">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+          <button id="openAddWorkerBtn" style="display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Add Worker
+          </button>
+        </div>
+        <div id="teamBySite"><div class="empty-note">Loading team…</div></div>
+      </div>
+
+      <!-- ============ ACTIVITY FEED PAGE ============ -->
+      <div class="page" id="page-activityfeed">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Activity Feed — All Workers</h3>
+            <input id="feedSearch" placeholder="Filter by worker..." style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12.5px;width:180px;outline:none;" />
+          </div>
+          <div class="panel-body" id="feedBody" style="padding-top:6px;"><div class="empty-note">Loading…</div></div>
+        </div>
+      </div>
+
+      <!-- ============ PLACEHOLDER PAGES (not built yet) ============ -->
+      <div class="page" id="page-attendance">
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">From</label>
+              <input type="date" id="attStart" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" />
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">To</label>
+              <input type="date" id="attEnd" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" />
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Site</label>
+              <select id="attSiteFilter" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;background:#fff;min-width:150px;"><option value="">All sites</option></select>
+            </div>
+            <div style="flex:1;min-width:160px;">
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Worker</label>
+              <input type="text" id="attSearch" placeholder="Search by name…" style="width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;" />
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label>
+              <button id="attFlaggedOnly" style="border:1px solid var(--line-strong);background:#fff;border-radius:8px;padding:9px 13px;font-size:12.5px;font-weight:600;color:var(--ink-dim);cursor:pointer;">Flagged only</button>
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label>
+              <button id="attExportBtn" style="border:none;background:var(--blue);color:#fff;border-radius:8px;padding:9px 15px;font-size:12.5px;font-weight:700;cursor:pointer;">Download CSV</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Check-in / Check-out Log</h3><span id="attCount" style="font-size:11.5px;color:var(--ink-faint);font-weight:600;"></span></div>
+          <div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;">
+            <table>
+              <thead><tr><th>Worker</th><th>Site</th><th>Type</th><th>Time</th><th>Distance</th><th>Status</th></tr></thead>
+              <tbody id="attTableBody"></tbody>
+            </table>
+            <div id="attEmpty" class="empty-note hidden">No check-ins match these filters.</div>
+          </div>
+        </div>
+      </div>
+      <div class="page" id="page-sites"><div class="panel"><div class="panel-body">
+        <div class="classic-note">Site management &amp; skill requirements are on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
+        <div style="padding:30px;text-align:center;color:var(--ink-faint);">Site directory with map pins — coming to this dashboard next.</div>
+      </div></div></div>
+      <div class="page" id="page-leave"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Days-off / leave requests aren't tracked yet — this page is next on the roadmap.</div></div></div>
+      <div class="page" id="page-skills"><div class="panel"><div class="panel-body">
+        <div class="classic-note">Skill tags &amp; worker tagging are on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
+      </div></div></div>
+      <div class="page" id="page-anomalies"><div class="panel"><div class="panel-head"><h3>Flagged Check-ins Awaiting Review</h3></div><div class="panel-body" id="anomaliesFullBody"><div class="empty-note">Loading…</div></div></div></div>
+      <div class="page" id="page-reports"><div class="panel"><div class="panel-body">
+        <div class="classic-note">CSV export by date range is on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
+        <div style="padding:30px;text-align:center;color:var(--ink-faint);">Per-worker and per-site exportable reports — coming to this dashboard next.</div>
+      </div></div></div>
+      <div class="page" id="page-devices">
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-body" style="display:flex;gap:12px;align-items:center;">
+            <input type="text" id="devSearch" placeholder="Search workers…" style="flex:1;border:1px solid var(--line-strong);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" />
+            <span id="devPendingBadge" class="nav-badge hidden" style="position:static;"></span>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Device Bindings</h3></div>
+          <div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;">
+            <table>
+              <thead><tr><th>Worker</th><th>Status</th><th>Bound Since</th><th></th></tr></thead>
+              <tbody id="devTableBody"></tbody>
+            </table>
+            <div id="devEmpty" class="empty-note hidden">No workers match this search.</div>
+          </div>
+        </div>
+      </div>
+      <div class="page" id="page-settings"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Geofence radius, work hours, and account settings — coming to this dashboard next.</div></div></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ================= WORKER DRAWER ================= -->
+<div class="drawer-overlay" id="addWorkerOverlay">
+  <div class="drawer" style="max-width:420px;">
+    <div class="drawer-head">
+      <div class="drawer-close" id="addWorkerCloseBtn">✕</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;color:var(--ink);">Add Worker</div>
+    </div>
+    <div class="drawer-body" style="padding:20px;">
+      <form id="addWorkerForm">
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Full name</label>
+        <input id="awFullName" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" placeholder="e.g. Ahmed Fathy" />
+
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Username</label>
+        <input id="awUsername" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;font-family:'JetBrains Mono',monospace;" placeholder="e.g. ahmed.f" />
+
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Temporary password</label>
+        <input id="awPassword" required type="text" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:4px;outline:none;font-family:'JetBrains Mono',monospace;" placeholder="min. 8 characters" />
+        <div style="font-size:11px;color:var(--ink-faint);margin-bottom:14px;">At least 8 characters. Share this with the worker directly — it isn't emailed automatically.</div>
+
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Phone (optional)</label>
+        <input id="awPhone" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" placeholder="01xxxxxxxxx" />
+
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Role</label>
+        <select id="awRole" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:18px;outline:none;background:#fff;">
+          <option value="employee" selected>Employee</option>
+          <option value="admin">Admin</option>
+        </select>
+
+        <div id="addWorkerError" class="hidden" style="background:var(--red-wash);color:var(--red);border-radius:var(--radius-sm);padding:10px 12px;font-size:12.5px;margin-bottom:14px;"></div>
+
+        <button type="submit" id="addWorkerSubmitBtn" style="width:100%;padding:12px 0;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Add Worker</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="drawer-overlay" id="drawerOverlay">
+  <div class="drawer">
+    <div class="drawer-head">
+      <div class="drawer-close" id="drawerCloseBtn">✕</div>
+      <div class="drawer-profile">
+        <div class="avatar-lg" id="dwAvatar">—</div>
+        <div>
+          <div class="drawer-name" id="dwName">—</div>
+          <div class="drawer-role" id="dwRole"></div>
+        </div>
+      </div>
+      <div class="drawer-stats">
+        <div><div class="dstat-val" id="dwAttendance">—</div><div class="dstat-label">Attendance</div></div>
+        <div><div class="dstat-val" id="dwDaysOff">—</div><div class="dstat-label">Days Off</div></div>
+        <div><div class="dstat-val" id="dwSites">—</div><div class="dstat-label">Sites</div></div>
       </div>
     </div>
-  `;
+    <div class="tabs">
+      <div class="tab active" data-tab="overview">Overview</div>
+      <div class="tab" data-tab="daysoff">Days Off</div>
+      <div class="tab" data-tab="sitelog">Site Log</div>
+      <div class="tab" data-tab="activity">Activity Log</div>
+      <div class="tab" data-tab="monthly">Monthly Report</div>
+    </div>
+    <div class="drawer-body">
+      <div class="tab-panel active" id="tab-overview">
+        <div class="panel" style="margin-bottom:14px;">
+          <div class="panel-head"><h3>Skills</h3></div>
+          <div class="panel-body" id="dwSkills"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Contact</h3></div>
+          <div class="panel-body" style="font-size:13px;line-height:2;">
+            <div>Phone: <span class="mono" id="dwPhone">—</span></div>
+            <div>Username: <span class="mono" id="dwUsername">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-daysoff"><div class="empty-note">Days-off tracking isn't built yet — coming in a future update.</div></div>
+      <div class="tab-panel" id="tab-sitelog"></div>
+      <div class="tab-panel" id="tab-activity"></div>
+      <div class="tab-panel" id="tab-monthly"></div>
+    </div>
+  </div>
+</div>
 
-  if (monthlyChartInstance) monthlyChartInstance.destroy();
-  const ctx = document.getElementById("monthlyChart");
-  const colors = daily.days.map((d) => (d.hours > 0 ? "#16A34A" : "#E7EBF3"));
-  monthlyChartInstance = new Chart(ctx, {
-    type: "bar",
-    data: { labels: daily.days.map((d) => d.day), datasets: [{ label: "Hours", data: daily.days.map((d) => d.hours), backgroundColor: colors, borderRadius: 4, maxBarThickness: 16 }] },
-    options: {
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: (ctx) => (daily.days[ctx.dataIndex].hours > 0 ? daily.days[ctx.dataIndex].hours + "h worked" : "Absent") } },
-      },
-      scales: { y: { beginAtZero: true, grid: { color: "#EEF1F7" }, ticks: { font: { size: 10.5 } } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } },
-    },
-  });
-}
+<div id="toast" class="toast hidden"></div>
+<style>
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:100;box-shadow:var(--shadow-lg);}
+.toast-error{background:var(--red);}
+.toast-success{background:var(--green);}
+.hidden{display:none !important;}
+</style>
 
-function updatePayTotal(present) {
-  const rate = parseFloat(document.getElementById("payRate").value) || 0;
-  document.getElementById("payTotal").textContent = "EGP " + (present * rate).toLocaleString();
-}
-
-function closeDrawer() {
-  document.getElementById("drawerOverlay").classList.remove("open");
-}
-
-function switchTab(name) {
-  document.querySelectorAll(".tab[data-tab]").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
-  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === "tab-" + name));
-  if (name === "activity" && !state.feed) loadActivityFeed();
-}
+<script>
+  // Auto-switch: localhost during local dev, Railway URL in production.
+  // Must match index.html's config exactly - without this, api.js silently
+  // falls back to http://localhost:4000/api, which gets blocked as mixed
+  // content on this https page and every API call fails with no status code.
+  window.HTN_API_BASE_URL =
+    (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+      ? "http://localhost:4000/api"
+      : "https://welcoming-blessing-production-6f01.up.railway.app/api";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/admin-dashboard.js"></script>
+</body>
+</html>
