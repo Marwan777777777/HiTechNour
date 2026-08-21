@@ -236,7 +236,7 @@ function initMap() {
   }).setView([30.0561, 31.3395], 14);
 
   L.tileLayer(
-    "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
     {
       attribution: "OpenStreetMap / CARTO",
       maxZoom: 19,
@@ -262,9 +262,9 @@ function initMap() {
 
   state.geofenceCircle = L.circle([30.0561, 31.3395], {
     radius: 200,
-    color: "#D97706",
+    color: "#F59E0B",
     weight: 1.5,
-    fillColor: "#D97706",
+    fillColor: "#F59E0B",
     fillOpacity: 0.08,
   });
 
