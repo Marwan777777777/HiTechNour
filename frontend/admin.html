@@ -1,751 +1,406 @@
-const adminState = { users: [], sites: [], skills: [] };
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HighTechNour — Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/admin-dashboard.css" />
+</head>
+<body>
 
-async function enterAdmin(user) {
-  showScreen("admin-screen");
-  document.getElementById("admin-user-name").textContent = user.fullName || user.username;
+<div class="app">
 
-  document.querySelectorAll(".tab-button").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-button").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.add("hidden"));
-      btn.classList.add("active");
-      document.getElementById(`tab-${btn.dataset.tab}`).classList.remove("hidden");
-    });
-  });
+  <div class="sidebar-scrim" id="sidebarScrim"></div>
 
-  const dateInput = document.getElementById("assignments-date");
-  dateInput.value = new Date().toISOString().slice(0, 10);
-  dateInput.addEventListener("change", () => loadAssignments(dateInput.value));
-
-  const workersMonthInput = document.getElementById("workers-month");
-  workersMonthInput.value = new Date().toISOString().slice(0, 7);
-  workersMonthInput.addEventListener("change", () => loadWorkers(workersMonthInput.value));
-
-  await Promise.all([loadFlaggedQueue(), loadTeam(), loadAdminSites(), loadWorkers(workersMonthInput.value)]);
-  await loadAssignments(dateInput.value);
-}
-
-// ---- Workers dashboard ----
-async function loadWorkers(month) {
-  const list = document.getElementById("workers-list");
-  try {
-    const users = adminState.users.length ? adminState.users : await Api.getUsers();
-    adminState.users = users;
-    list.innerHTML = "";
-    if (users.length === 0) {
-      list.innerHTML = `<li class="admin-item is-empty">No workers yet.</li>`;
-      return;
-    }
-    users.forEach((u) => {
-      const li = document.createElement("li");
-      li.className = "admin-item";
-      li.innerHTML = `
-        <div>
-          <div>${u.full_name}</div>
-          <div class="meta">@${u.username} · ${u.role}</div>
-        </div>
-        <button class="secondary-button" data-worker-id="${u.id}">View</button>
-      `;
-      list.appendChild(li);
-    });
-    list.querySelectorAll("[data-worker-id]").forEach((btn) => {
-      btn.addEventListener("click", () => openWorkerDetail(btn.dataset.workerId, month));
-    });
-  } catch (err) {
-    showToast(err.message, "error");
-  }
-}
-
-async function openWorkerDetail(userId, month) {
-  try {
-    await ensureSkillsLoaded();
-    const summary = await Api.workerSummary(userId, month);
-    const { user, attendance, tasks, teammates, skills } = summary;
-    const pct = attendance.daysInMonth
-      ? Math.round((attendance.daysPresent / attendance.daysInMonth) * 100)
-      : 0;
-    const tier = pct < 50 ? "tier-low" : pct < 80 ? "tier-mid" : "tier-high";
-
-    // Check-in/check-out log for this worker. There's no per-worker
-    // endpoint yet, so this filters the existing admin check-in feed by
-    // username client-side. Fine at current scale; if the org grows large
-    // enough that /checkins gets slow, add a ?userId= filter server-side
-    // and swap this for that instead of filtering in the browser.
-    let logsHtml = `<li class="admin-item is-empty">Loading…</li>`;
-    try {
-      const allLogs = await Api.allCheckins(false);
-      const workerLogs = allLogs
-        .filter((c) => c.username === user.username)
-        .slice(0, 30);
-      logsHtml = workerLogs.length
-        ? workerLogs
-            .map((c) => {
-              const inside = c.status === "inside";
-              const time = new Date(c.created_at).toLocaleString();
-              return `
-        <li class="admin-item ${inside ? "is-inside" : "is-outside"}">
-          <div>
-            <div>${c.type === "check_in" ? "Checked in" : "Checked out"} · ${c.site_name}</div>
-            <div class="meta">${time} · ${Math.round(c.distance_meters)}m</div>
-          </div>
-          <span class="badge ${inside ? "badge-inside" : "badge-outside"}">${c.status}</span>
-        </li>`;
-            })
-            .join("")
-        : `<li class="admin-item is-empty">No check-in activity yet.</li>`;
-    } catch {
-      logsHtml = `<li class="admin-item is-empty">Couldn't load logs.</li>`;
-    }
-
-    const tasksHtml = tasks.length
-      ? tasks
-          .map(
-            (t) => `
-        <li class="admin-item">
-          <div>
-            <div>${t.site_name}${t.task ? ` · ${t.task}` : ""}</div>
-            <div class="meta">${t.start_date} → ${t.end_date}</div>
-          </div>
-        </li>`
-          )
-          .join("")
-      : `<li class="admin-item is-empty">No assignments this month.</li>`;
-
-    const teamHtml = teammates.length
-      ? teammates
-          .map(
-            (t) => `
-        <li class="admin-item">
-          <div>
-            <div>${t.full_name}</div>
-            <div class="meta">@${t.username} · ${t.site_name}</div>
-          </div>
-        </li>`
-          )
-          .join("")
-      : `<li class="admin-item is-empty">Worked alone this month.</li>`;
-
-    const skillTagsHtml = skills.length
-      ? skills
-          .map(
-            (s) => `
-        <span class="skill-tag">
-          ${s.name}
-          <span class="level-dots">${[1, 2, 3, 4, 5]
-            .map((n) => `<span class="${n <= s.level ? "filled" : ""}"></span>`)
-            .join("")}</span>
-          <button class="remove-skill" data-remove-skill-id="${s.skill_id}" title="Remove">×</button>
-        </span>`
-          )
-          .join("")
-      : `<span class="meta">No skills tagged yet.</span>`;
-
-    const skillOptions = adminState.skills.length
-      ? adminState.skills.map((s) => `<option value="${s.id}">${s.name}</option>`).join("")
-      : `<option disabled>No skill tags yet - add some under Sites → Manage Skill Tags</option>`;
-
-    openReadOnlyModal(
-      `${user.fullName}`,
-      `
-      <div class="worker-detail">
-        <div class="attendance-summary-head">
-          <h3>Attendance — ${attendance.month}</h3>
-        </div>
-        <div class="attendance-days">${attendance.daysPresent} / ${attendance.daysInMonth} days</div>
-        <div class="attendance-bar"><div class="attendance-bar-fill ${tier}" style="width:${pct}%"></div></div>
-
-        <h3 class="worker-detail-heading">Skills</h3>
-        <div class="skill-tag-row">${skillTagsHtml}</div>
-        <div class="modal-inline-form">
-          <select id="w-skill-select">${skillOptions}</select>
-          <select id="w-skill-level">
-            <option value="1">Level 1</option>
-            <option value="2">Level 2</option>
-            <option value="3" selected>Level 3</option>
-            <option value="4">Level 4</option>
-            <option value="5">Level 5</option>
-          </select>
-          <button id="add-worker-skill-btn" class="secondary-button">+ Tag</button>
-        </div>
-
-        <h3 class="worker-detail-heading">Tasks &amp; Sites</h3>
-        <ul class="admin-list">${tasksHtml}</ul>
-
-        <h3 class="worker-detail-heading">Team</h3>
-        <ul class="admin-list">${teamHtml}</ul>
-
-        <h3 class="worker-detail-heading">Check-in / Check-out Log</h3>
-        <ul class="admin-list">${logsHtml}</ul>
+  <!-- ================= SIDEBAR ================= -->
+  <div class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">H</div>
+      <div>
+        <div class="brand-name">HIGHTECHNOUR</div>
+        <div class="brand-sub">Attendance</div>
       </div>
-    `
-    );
-
-    document.querySelectorAll("[data-remove-skill-id]").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        try {
-          await Api.removeWorkerSkill(userId, btn.dataset.removeSkillId);
-          openWorkerDetail(userId, month);
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      });
-    });
-
-    const addSkillBtn = document.getElementById("add-worker-skill-btn");
-    if (addSkillBtn) {
-      addSkillBtn.addEventListener("click", async () => {
-        const skillId = document.getElementById("w-skill-select").value;
-        const level = Number(document.getElementById("w-skill-level").value);
-        try {
-          await Api.setWorkerSkill(userId, skillId, level);
-          showToast("Skill tagged.", "success");
-          openWorkerDetail(userId, month);
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      });
-    }
-  } catch (err) {
-    showToast(err.message, "error");
-  }
-}
-
-document.getElementById("admin-logout-button").addEventListener("click", () => {
-  Auth.logout();
-  window.location.reload();
-});
-
-// ---- Review queue ----
-async function loadFlaggedQueue() {
-  const list = document.getElementById("flagged-list");
-  try {
-    const items = await Api.allCheckins(true);
-    list.innerHTML = "";
-    if (items.length === 0) {
-      list.innerHTML = `<li class="admin-item is-empty">Nothing pending review.</li>`;
-      return;
-    }
-    items.forEach((item) => {
-      const li = document.createElement("li");
-      li.className = "admin-item";
-      const time = new Date(item.created_at).toLocaleString();
-      li.innerHTML = `
-        <div>
-          <div>${item.full_name} · ${item.site_name}</div>
-          <div class="meta">${time} · ${item.type.replace("_", " ")} · ${Math.round(item.distance_meters)}m</div>
-          <span class="badge badge-flagged">${item.flag_reason.replace(/_/g, " ")}</span>
-        </div>
-        <button class="secondary-button" data-review-id="${item.id}">Mark Reviewed</button>
-      `;
-      list.appendChild(li);
-    });
-    list.querySelectorAll("[data-review-id]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        btn.disabled = true;
-        try {
-          await Api.reviewCheckin(btn.dataset.reviewId);
-          await loadFlaggedQueue();
-          showToast("Marked as reviewed.", "success");
-        } catch (err) {
-          showToast(err.message, "error");
-          btn.disabled = false;
-        }
-      });
-    });
-  } catch (err) {
-    showToast(err.message, "error");
-  }
-}
-
-// ---- Team ----
-async function loadTeam() {
-  const list = document.getElementById("team-list");
-  try {
-    const users = await Api.getUsers();
-    adminState.users = users;
-    list.innerHTML = "";
-    if (users.length === 0) {
-      list.innerHTML = `<li class="admin-item is-empty">No team members yet.</li>`;
-      return;
-    }
-    users.forEach((u) => {
-      const li = document.createElement("li");
-      li.className = "admin-item";
-      const deviceStatus = u.device_approved
-        ? "Device approved"
-        : u.device_pending
-        ? "Device pending approval"
-        : "No device registered";
-      li.innerHTML = `
-        <div>
-          <div>${u.full_name} (${u.username})${u.role === "admin" ? " · admin" : ""}</div>
-          <div class="meta">${deviceStatus} · ${u.active ? "active" : "disabled"}</div>
-        </div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
-          ${u.device_pending ? `<button class="secondary-button" data-approve="${u.id}">Approve Device</button>` : ""}
-          ${u.device_approved ? `<button class="secondary-button" data-reset-device="${u.id}">Reset Device</button>` : ""}
-          <button class="secondary-button" data-force-logout="${u.id}">Force Logout</button>
-          <button class="secondary-button" data-toggle-active="${u.id}" data-active="${u.active}">${u.active ? "Disable" : "Enable"}</button>
-        </div>
-      `;
-      list.appendChild(li);
-    });
-
-    list.querySelectorAll("[data-approve]").forEach((btn) =>
-      btn.addEventListener("click", async () => {
-        try {
-          await Api.approveDevice(btn.dataset.approve);
-          showToast("Device approved.", "success");
-          await loadTeam();
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      })
-    );
-    list.querySelectorAll("[data-reset-device]").forEach((btn) =>
-      btn.addEventListener("click", async () => {
-        if (!confirm("Reset this worker's bound device? They'll need re-approval on their next check-in.")) return;
-        try {
-          await Api.resetDevice(btn.dataset.resetDevice);
-          showToast("Device binding reset.", "success");
-          await loadTeam();
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      })
-    );
-    list.querySelectorAll("[data-force-logout]").forEach((btn) =>
-      btn.addEventListener("click", async () => {
-        if (!confirm("Sign this worker out on every device? They'll need to log in again next time.")) return;
-        try {
-          await Api.forceLogout(btn.dataset.forceLogout);
-          showToast("Worker signed out on all devices.", "success");
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      })
-    );
-    list.querySelectorAll("[data-toggle-active]").forEach((btn) =>
-      btn.addEventListener("click", async () => {
-        const currentlyActive = btn.dataset.active === "true";
-        try {
-          await Api.updateUser(btn.dataset.toggleActive, { active: !currentlyActive });
-          showToast(currentlyActive ? "Worker disabled." : "Worker enabled.", "success");
-          await loadTeam();
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      })
-    );
-  } catch (err) {
-    showToast(err.message, "error");
-  }
-}
-
-document.getElementById("add-user-button").addEventListener("click", () => {
-  openModal("Add Worker", `
-    <input id="m-username" placeholder="Username" />
-    <input id="m-password" type="password" placeholder="Temporary password (min 8 chars)" />
-    <input id="m-fullname" placeholder="Full name" />
-    <input id="m-phone" placeholder="Phone (optional, for WhatsApp contact)" />
-  `, async () => {
-    const username = document.getElementById("m-username").value.trim();
-    const password = document.getElementById("m-password").value;
-    const fullName = document.getElementById("m-fullname").value.trim();
-    const phone = document.getElementById("m-phone").value.trim();
-    await Api.createUser({ username, password, fullName, phone });
-    showToast("Worker added.", "success");
-    await loadTeam();
-  });
-});
-
-// ---- Assignments ----
-async function loadAssignments(date) {
-  const list = document.getElementById("assignments-list");
-  try {
-    const assignments = await Api.getAssignments(date);
-    list.innerHTML = "";
-    if (assignments.length === 0) {
-      list.innerHTML = `<li class="admin-item is-empty">No one assigned for this date.</li>`;
-      return;
-    }
-    assignments.forEach((a) => {
-      const li = document.createElement("li");
-      li.className = "admin-item";
-      const range = a.start_date === a.end_date ? a.start_date : `${a.start_date} → ${a.end_date}`;
-      li.innerHTML = `
-        <div>
-          <div>${a.full_name} → ${a.site_name}</div>
-          <div class="meta">${a.task ? a.task + " · " : ""}${range}</div>
-        </div>
-        <button class="secondary-button" data-delete-assignment="${a.id}">Remove</button>
-      `;
-      list.appendChild(li);
-    });
-    list.querySelectorAll("[data-delete-assignment]").forEach((btn) =>
-      btn.addEventListener("click", async () => {
-        if (!confirm("Remove this assignment?")) return;
-        try {
-          await Api.deleteAssignment(btn.dataset.deleteAssignment);
-          await loadAssignments(document.getElementById("assignments-date").value);
-          showToast("Assignment removed.", "success");
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      })
-    );
-  } catch (err) {
-    showToast(err.message, "error");
-  }
-}
-
-document.getElementById("add-assignment-button").addEventListener("click", () => {
-  if (adminState.users.length === 0 || adminState.sites.length === 0) {
-    showToast("Add a worker and a site first.", "error");
-    return;
-  }
-  const today = document.getElementById("assignments-date").value;
-  const userOptions = adminState.users
-    .filter((u) => u.role === "employee")
-    .map((u) => `<option value="${u.id}">${u.full_name}</option>`)
-    .join("");
-  const siteOptions = adminState.sites.map((s) => `<option value="${s.id}">${s.name}</option>`).join("");
-
-  openModal("Assign Worker", `
-    <label>Worker<select id="m-a-user">${userOptions}</select></label>
-    <label>Site<select id="m-a-site">${siteOptions}</select></label>
-    <input id="m-a-task" placeholder="Task (optional, e.g. 'Fix camera 4')" />
-    <label>Start date<input id="m-a-start" type="date" value="${today}" /></label>
-    <label>End date (leave same as start for one day)<input id="m-a-end" type="date" value="${today}" /></label>
-  `, async () => {
-    const userId = Number(document.getElementById("m-a-user").value);
-    const siteId = Number(document.getElementById("m-a-site").value);
-    const task = document.getElementById("m-a-task").value.trim();
-    const startDate = document.getElementById("m-a-start").value;
-    const endDate = document.getElementById("m-a-end").value;
-    await Api.createAssignment({ userId, siteId, task, startDate, endDate });
-    showToast("Worker assigned.", "success");
-    await loadAssignments(document.getElementById("assignments-date").value);
-  });
-});
-
-// ---- Sites ----
-async function loadAdminSites() {
-  const list = document.getElementById("sites-list");
-  try {
-    const sites = await Api.getSites();
-    adminState.sites = sites;
-    list.innerHTML = "";
-    if (sites.length === 0) {
-      list.innerHTML = `<li class="admin-item is-empty">No sites yet - add one below.</li>`;
-      return;
-    }
-    sites.forEach((s) => {
-      const li = document.createElement("li");
-      li.className = "admin-item";
-      li.innerHTML = `
-        <div>
-          <div>${s.name}</div>
-          <div class="meta">${s.address || ""} · ${s.radius_meters}m radius</div>
-        </div>
-        <button class="secondary-button" data-req-site-id="${s.id}">Requirements</button>
-      `;
-      list.appendChild(li);
-    });
-    list.querySelectorAll("[data-req-site-id]").forEach((btn) => {
-      const site = sites.find((s) => String(s.id) === btn.dataset.reqSiteId);
-      btn.addEventListener("click", () => openSiteRequirements(site));
-    });
-  } catch (err) {
-    showToast(err.message, "error");
-  }
-}
-
-// ---- Skill catalog (shared list of tags like "Software", "Gates Tech") ----
-async function ensureSkillsLoaded() {
-  if (!adminState.skills.length) {
-    adminState.skills = await Api.getSkills();
-  }
-  return adminState.skills;
-}
-
-document.getElementById("manage-skills-button").addEventListener("click", async () => {
-  await ensureSkillsLoaded();
-  renderSkillCatalogModal();
-});
-
-function renderSkillCatalogModal() {
-  const rowsHtml = adminState.skills.length
-    ? adminState.skills.map((s) => `<li class="admin-item"><div>${s.name}</div></li>`).join("")
-    : `<li class="admin-item is-empty">No skill tags yet - add one below.</li>`;
-
-  openReadOnlyModal(
-    "Skill Tags",
-    `
-    <ul class="admin-list">${rowsHtml}</ul>
-    <div class="modal-inline-form">
-      <input id="new-skill-name" placeholder="e.g. Software, Gates Technician, HVAC" />
-      <button id="add-skill-btn" class="secondary-button">+ Add Tag</button>
     </div>
-  `
-  );
 
-  document.getElementById("add-skill-btn").addEventListener("click", async () => {
-    const input = document.getElementById("new-skill-name");
-    const name = input.value.trim();
-    if (!name) return;
-    try {
-      await Api.createSkill(name);
-      adminState.skills = await Api.getSkills();
-      showToast("Skill tag added.", "success");
-      renderSkillCatalogModal();
-    } catch (err) {
-      showToast(err.message, "error");
-    }
-  });
-}
-
-// ---- Site requirements + matching workers ----
-async function openSiteRequirements(site) {
-  try {
-    await ensureSkillsLoaded();
-    const requirements = await Api.getSiteRequirements(site.id);
-
-    const skillOptions = adminState.skills
-      .map((s) => `<option value="${s.id}">${s.name}</option>`)
-      .join("");
-
-    const reqRows = requirements.length
-      ? requirements
-          .map((r) => {
-            const short = r.workers_available < r.workers_needed;
-            return `
-        <div class="requirement-row" data-skill-id="${r.skill_id}" data-skill-name="${r.skill_name}">
-          <span class="req-name">${r.skill_name}</span>
-          <span class="req-count ${short ? "shortfall" : "met"}">
-            needs ${r.workers_needed} · ${r.workers_available} available
-          </span>
-        </div>`;
-          })
-          .join("")
-      : `<div class="meta">No skill requirements set for this site yet.</div>`;
-
-    openReadOnlyModal(
-      `${site.name} — Requirements`,
-      `
-      <div>${reqRows}</div>
-      <div class="modal-inline-form">
-        <select id="req-skill-select">${skillOptions || "<option disabled>No skill tags yet</option>"}</select>
-        <input id="req-count-input" type="number" min="1" value="1" style="width:70px" />
-        <button id="add-requirement-btn" class="secondary-button">+ Add</button>
+    <div class="nav-group">
+      <div class="nav-item active" data-page="overview">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Overview
       </div>
-    `
-    );
+    </div>
 
-    document.querySelectorAll(".requirement-row").forEach((row) => {
-      row.addEventListener("click", () =>
-        openSkillMatches(row.dataset.skillId, row.dataset.skillName)
-      );
-    });
+    <div class="nav-group">
+      <div class="nav-label">Operations</div>
+      <div class="nav-item" data-page="attendance">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Attendance
+      </div>
+      <div class="nav-item" data-page="team">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team
+      </div>
+      <div class="nav-item" data-page="sites">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        Sites
+      </div>
+      <div class="nav-item" data-page="leave">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9h18"/></svg>
+        Days Off
+      </div>
+      <div class="nav-item" data-page="skills">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 6.9L21 9l-5.5 4.6L17.4 21 12 17l-5.4 4 1.9-7.4L3 9l6.6-.1z"/></svg>
+        Skills
+      </div>
+    </div>
 
-    const addBtn = document.getElementById("add-requirement-btn");
-    if (addBtn) {
-      addBtn.addEventListener("click", async () => {
-        const skillId = document.getElementById("req-skill-select").value;
-        const workersNeeded = Number(document.getElementById("req-count-input").value) || 1;
-        try {
-          await Api.setSiteRequirement(site.id, skillId, workersNeeded);
-          showToast("Requirement saved.", "success");
-          openSiteRequirements(site);
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      });
-    }
-  } catch (err) {
-    showToast(err.message, "error");
-  }
-}
+    <div class="nav-group">
+      <div class="nav-label">Analytics</div>
+      <div class="nav-item" data-page="anomalies">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+        Anomalies
+        <span class="nav-badge hidden" id="anomaliesBadge">0</span>
+      </div>
+      <div class="nav-item" data-page="activityfeed">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Activity Feed
+      </div>
+      <div class="nav-item" data-page="reports">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/></svg>
+        Reports
+      </div>
+    </div>
 
-// The "click a required skill, see everyone who fits" view.
-async function openSkillMatches(skillId, skillName) {
-  try {
-    const workers = await Api.getSkillWorkers(skillId);
-    const rows = workers.length
-      ? workers
-          .map(
-            (w) => `
-        <li class="admin-item">
-          <div>
-            <div>${w.full_name}${w.active ? "" : " (inactive)"}</div>
-            <div class="meta">@${w.username}${w.phone ? ` · ${w.phone}` : ""}</div>
+    <div class="nav-group">
+      <div class="nav-label">System</div>
+      <div class="nav-item" data-page="devices">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+        Devices
+      </div>
+      <div class="nav-item" data-page="settings">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </div>
+    </div>
+
+    <div class="sidebar-footer" id="logoutFooter" title="Sign out">
+      <div class="avatar-sm" id="footerAvatar">A</div>
+      <div>
+        <div class="footer-name" id="footerName">Admin</div>
+        <div class="footer-role">Sign out</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MAIN ================= -->
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="menu-btn" id="menuBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <div class="topbar-title">
+          <h1 id="pageTitle">Overview</h1>
+          <span>·</span>
+          <span id="topbarDate"></span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="icon-btn" id="refreshBtn" title="Refresh">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ============ OVERVIEW PAGE ============ -->
+      <div class="page active" id="page-overview">
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:var(--blue-wash);color:var(--blue);">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              </div>
+              <div class="kpi-label">Total Workers</div>
+            </div>
+            <div class="kpi-value" id="kpiTotal">—</div>
+            <div class="kpi-sub" id="kpiTotalSub">&nbsp;</div>
           </div>
-          <span class="skill-tag">
-            <span class="level-dots">${[1, 2, 3, 4, 5]
-              .map((n) => `<span class="${n <= w.level ? "filled" : ""}"></span>`)
-              .join("")}</span>
-          </span>
-        </li>`
-          )
-          .join("")
-      : `<li class="admin-item is-empty">No workers tagged with this skill yet.</li>`;
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:var(--green-wash);color:var(--green);">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+              </div>
+              <div class="kpi-label">Present Today</div>
+            </div>
+            <div class="kpi-value" id="kpiPresent">—</div>
+            <div class="kpi-sub" id="kpiPresentSub">&nbsp;</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:var(--amber-wash);color:var(--amber);">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+              </div>
+              <div class="kpi-label">Late</div>
+            </div>
+            <div class="kpi-value" id="kpiLate">—</div>
+            <div class="kpi-sub" id="kpiLateSub">&nbsp;</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:var(--red-wash);color:var(--red);">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+              </div>
+              <div class="kpi-label">Absent</div>
+            </div>
+            <div class="kpi-value" id="kpiAbsent">—</div>
+            <div class="kpi-sub" id="kpiAbsentSub">&nbsp;</div>
+          </div>
+        </div>
 
-    openReadOnlyModal(`Workers: ${skillName}`, `<ul class="admin-list">${rows}</ul>`);
-  } catch (err) {
-    showToast(err.message, "error");
-  }
-}
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><h3>Attendance Overview — Last 6 Days</h3></div>
+            <div class="panel-body"><canvas id="attendanceChart" height="150"></canvas></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Attendance by Site — Today</h3></div>
+            <div class="panel-body" style="display:flex;gap:14px;align-items:center;">
+              <canvas id="siteDonut" width="120" height="120" style="flex-shrink:0;"></canvas>
+              <div style="flex:1;" id="siteDonutLegend"></div>
+            </div>
+          </div>
+        </div>
 
-// Extracts { lat, lng } from a pasted Google Maps URL or a plain "lat, lng" string.
-// Supports: /@lat,lng,zoom  |  ?q=lat,lng  |  !3dLAT!4dLNG (place links)  |  plain "lat, lng"
-function parseGoogleMapsLink(input) {
-  const text = (input || "").trim();
-  if (!text) return null;
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Recent Attendance — Today</h3>
+              <span class="link-btn" onclick="showPage('team')">View all</span>
+            </div>
+            <div class="panel-body" style="padding:0 18px 8px;">
+              <table id="recentAttendanceTable">
+                <tr><th>Worker</th><th>Site</th><th>Check In</th><th>Check Out</th><th>Status</th></tr>
+              </table>
+              <div class="empty-note hidden" id="recentAttendanceEmpty">No check-ins yet today.</div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Review Queue</h3>
+              <span class="link-btn" onclick="showPage('anomalies')">View all</span>
+            </div>
+            <div class="panel-body" id="reviewQueueBody">
+              <div class="empty-note">Nothing flagged. Loading…</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-  // Plain "lat, lng" or "lat lng"
-  let m = text.match(/^(-?\d{1,3}\.\d+)[,\s]+(-?\d{1,3}\.\d+)$/);
-  if (m) return { lat: Number(m[1]), lng: Number(m[2]) };
+      <!-- ============ TEAM PAGE ============ -->
+      <div class="page" id="page-team">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+          <button id="openAddWorkerBtn" style="display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Add Worker
+          </button>
+        </div>
+        <div id="teamBySite"><div class="empty-note">Loading team…</div></div>
+      </div>
 
-  // /@lat,lng,zoom  (most common when copying from the address bar)
-  m = text.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
-  if (m) return { lat: Number(m[1]), lng: Number(m[2]) };
+      <!-- ============ ACTIVITY FEED PAGE ============ -->
+      <div class="page" id="page-activityfeed">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Activity Feed — All Workers</h3>
+            <input id="feedSearch" placeholder="Filter by worker..." style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12.5px;width:180px;outline:none;" />
+          </div>
+          <div class="panel-body" id="feedBody" style="padding-top:6px;"><div class="empty-note">Loading…</div></div>
+        </div>
+      </div>
 
-  // ?q=lat,lng  or  &q=lat,lng
-  m = text.match(/[?&]q=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
-  if (m) return { lat: Number(m[1]), lng: Number(m[2]) };
+      <!-- ============ PLACEHOLDER PAGES (not built yet) ============ -->
+      <div class="page" id="page-attendance">
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">From</label>
+              <input type="date" id="attStart" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" />
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">To</label>
+              <input type="date" id="attEnd" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" />
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Site</label>
+              <select id="attSiteFilter" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;background:#fff;min-width:150px;"><option value="">All sites</option></select>
+            </div>
+            <div style="flex:1;min-width:160px;">
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Worker</label>
+              <input type="text" id="attSearch" placeholder="Search by name…" style="width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;" />
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label>
+              <button id="attFlaggedOnly" style="border:1px solid var(--line-strong);background:#fff;border-radius:8px;padding:9px 13px;font-size:12.5px;font-weight:600;color:var(--ink-dim);cursor:pointer;">Flagged only</button>
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label>
+              <button id="attExportBtn" style="border:none;background:var(--blue);color:#fff;border-radius:8px;padding:9px 15px;font-size:12.5px;font-weight:700;cursor:pointer;">Download CSV</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Check-in / Check-out Log</h3><span id="attCount" style="font-size:11.5px;color:var(--ink-faint);font-weight:600;"></span></div>
+          <div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;">
+            <table>
+              <thead><tr><th>Worker</th><th>Site</th><th>Type</th><th>Time</th><th>Distance</th><th>Status</th></tr></thead>
+              <tbody id="attTableBody"></tbody>
+            </table>
+            <div id="attEmpty" class="empty-note hidden">No check-ins match these filters.</div>
+          </div>
+        </div>
+      </div>
+      <div class="page" id="page-sites"><div class="panel"><div class="panel-body">
+        <div class="classic-note">Site management &amp; skill requirements are on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
+        <div style="padding:30px;text-align:center;color:var(--ink-faint);">Site directory with map pins — coming to this dashboard next.</div>
+      </div></div></div>
+      <div class="page" id="page-leave"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Days-off / leave requests aren't tracked yet — this page is next on the roadmap.</div></div></div>
+      <div class="page" id="page-skills"><div class="panel"><div class="panel-body">
+        <div class="classic-note">Skill tags &amp; worker tagging are on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
+      </div></div></div>
+      <div class="page" id="page-anomalies"><div class="panel"><div class="panel-head"><h3>Flagged Check-ins Awaiting Review</h3></div><div class="panel-body" id="anomaliesFullBody"><div class="empty-note">Loading…</div></div></div></div>
+      <div class="page" id="page-reports"><div class="panel"><div class="panel-body">
+        <div class="classic-note">CSV export by date range is on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
+        <div style="padding:30px;text-align:center;color:var(--ink-faint);">Per-worker and per-site exportable reports — coming to this dashboard next.</div>
+      </div></div></div>
+      <div class="page" id="page-devices">
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-body" style="display:flex;gap:12px;align-items:center;">
+            <input type="text" id="devSearch" placeholder="Search workers…" style="flex:1;border:1px solid var(--line-strong);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" />
+            <span id="devPendingBadge" class="nav-badge hidden" style="position:static;"></span>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Device Bindings</h3></div>
+          <div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;">
+            <table>
+              <thead><tr><th>Worker</th><th>Status</th><th>Bound Since</th><th></th></tr></thead>
+              <tbody id="devTableBody"></tbody>
+            </table>
+            <div id="devEmpty" class="empty-note hidden">No workers match this search.</div>
+          </div>
+        </div>
+      </div>
+      <div class="page" id="page-settings"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Geofence radius, work hours, and account settings — coming to this dashboard next.</div></div></div>
 
-  // !3dLAT!4dLNG  (embedded in "place" links)
-  m = text.match(/!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/);
-  if (m) return { lat: Number(m[1]), lng: Number(m[2]) };
+    </div>
+  </div>
+</div>
 
-  return null;
-}
+<!-- ================= WORKER DRAWER ================= -->
+<div class="drawer-overlay" id="addWorkerOverlay">
+  <div class="drawer" style="max-width:420px;">
+    <div class="drawer-head">
+      <div class="drawer-close" id="addWorkerCloseBtn">✕</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;color:var(--ink);">Add Worker</div>
+    </div>
+    <div class="drawer-body" style="padding:20px;">
+      <form id="addWorkerForm">
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Full name</label>
+        <input id="awFullName" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" placeholder="e.g. Ahmed Fathy" />
 
-document.getElementById("add-site-button").addEventListener("click", () => {
-  openModal("Add Site", `
-    <input id="m-site-name" placeholder="Site name" />
-    <input id="m-site-address" placeholder="Address" />
-    <input id="m-site-maps-link" placeholder="Paste Google Maps link (optional)" />
-    <div id="m-site-maps-hint" class="field-hint"></div>
-    <input id="m-site-lat" placeholder="Latitude (e.g. 30.0452333)" />
-    <input id="m-site-lng" placeholder="Longitude (e.g. 31.341210)" />
-    <input id="m-site-radius" placeholder="Radius in meters (default 200)" />
-  `, async () => {
-    const name = document.getElementById("m-site-name").value.trim();
-    const address = document.getElementById("m-site-address").value.trim();
-    const lat = Number(document.getElementById("m-site-lat").value);
-    const lng = Number(document.getElementById("m-site-lng").value);
-    const radiusInput = document.getElementById("m-site-radius").value;
-    const radiusMeters = radiusInput ? Number(radiusInput) : 200;
-    await Api.createSite({ name, address, lat, lng, radiusMeters });
-    showToast("Site added.", "success");
-    await loadAdminSites();
-  });
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Username</label>
+        <input id="awUsername" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;font-family:'JetBrains Mono',monospace;" placeholder="e.g. ahmed.f" />
 
-  const linkInput = document.getElementById("m-site-maps-link");
-  const hint = document.getElementById("m-site-maps-hint");
-  const latInput = document.getElementById("m-site-lat");
-  const lngInput = document.getElementById("m-site-lng");
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Temporary password</label>
+        <input id="awPassword" required type="text" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:4px;outline:none;font-family:'JetBrains Mono',monospace;" placeholder="min. 8 characters" />
+        <div style="font-size:11px;color:var(--ink-faint);margin-bottom:14px;">At least 8 characters. Share this with the worker directly — it isn't emailed automatically.</div>
 
-  linkInput.addEventListener("input", () => {
-    const value = linkInput.value.trim();
-    if (!value) {
-      hint.textContent = "";
-      return;
-    }
-    if (/goo\.gl|maps\.app\.goo\.gl/.test(value)) {
-      hint.textContent = "Shortened links can't be read directly — open it in the browser first, then paste the full expanded URL here.";
-      hint.classList.add("field-hint-error");
-      return;
-    }
-    const coords = parseGoogleMapsLink(value);
-    if (coords) {
-      latInput.value = coords.lat;
-      lngInput.value = coords.lng;
-      hint.textContent = `Detected: ${coords.lat}, ${coords.lng}`;
-      hint.classList.remove("field-hint-error");
-    } else {
-      hint.textContent = "Couldn't find coordinates in that link — paste lat/lng manually below.";
-      hint.classList.add("field-hint-error");
-    }
-  });
-});
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Phone (optional)</label>
+        <input id="awPhone" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" placeholder="01xxxxxxxxx" />
 
-// ---- Export ----
-document.getElementById("export-button").addEventListener("click", async () => {
-  const start = document.getElementById("export-start").value;
-  const end = document.getElementById("export-end").value;
-  if (!start || !end) {
-    showToast("Pick a start and end date.", "error");
-    return;
-  }
-  const button = document.getElementById("export-button");
-  setButtonLoading(button, true);
-  try {
-    const blob = await Api.exportCsv(start, end);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "HTN_Attendance_Report.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    showToast(err.message, "error");
-  } finally {
-    setButtonLoading(button, false);
-  }
-});
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Role</label>
+        <select id="awRole" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:18px;outline:none;background:#fff;">
+          <option value="employee" selected>Employee</option>
+          <option value="admin">Admin</option>
+        </select>
 
-// ---- Read-only modal (worker detail, etc.) - single "Close" button, no
-// confirm/cancel pair since there's nothing to submit. ----
-function openReadOnlyModal(title, bodyHtml) {
-  document.getElementById("modal-title").textContent = title;
-  document.getElementById("modal-body").innerHTML = bodyHtml;
-  document.getElementById("modal").classList.remove("hidden");
+        <div id="addWorkerError" class="hidden" style="background:var(--red-wash);color:var(--red);border-radius:var(--radius-sm);padding:10px 12px;font-size:12.5px;margin-bottom:14px;"></div>
 
-  const confirmBtn = document.getElementById("modal-confirm");
-  const cancelBtn = document.getElementById("modal-cancel");
-  const closeModal = () => document.getElementById("modal").classList.add("hidden");
+        <button type="submit" id="addWorkerSubmitBtn" style="width:100%;padding:12px 0;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Add Worker</button>
+      </form>
+    </div>
+  </div>
+</div>
 
-  const newConfirm = confirmBtn.cloneNode(true);
-  newConfirm.querySelector(".btn-label").textContent = "Close";
-  confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
-  newConfirm.addEventListener("click", closeModal);
+<div class="drawer-overlay" id="drawerOverlay">
+  <div class="drawer">
+    <div class="drawer-head">
+      <div class="drawer-close" id="drawerCloseBtn">✕</div>
+      <div class="drawer-profile">
+        <div class="avatar-lg" id="dwAvatar">—</div>
+        <div>
+          <div class="drawer-name" id="dwName">—</div>
+          <div class="drawer-role" id="dwRole"></div>
+        </div>
+      </div>
+      <div class="drawer-stats">
+        <div><div class="dstat-val" id="dwAttendance">—</div><div class="dstat-label">Attendance</div></div>
+        <div><div class="dstat-val" id="dwDaysOff">—</div><div class="dstat-label">Days Off</div></div>
+        <div><div class="dstat-val" id="dwSites">—</div><div class="dstat-label">Sites</div></div>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="overview">Overview</div>
+      <div class="tab" data-tab="daysoff">Days Off</div>
+      <div class="tab" data-tab="sitelog">Site Log</div>
+      <div class="tab" data-tab="activity">Activity Log</div>
+      <div class="tab" data-tab="monthly">Monthly Report</div>
+    </div>
+    <div class="drawer-body">
+      <div class="tab-panel active" id="tab-overview">
+        <div class="panel" style="margin-bottom:14px;">
+          <div class="panel-head"><h3>Skills</h3></div>
+          <div class="panel-body" id="dwSkills"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Contact</h3></div>
+          <div class="panel-body" style="font-size:13px;line-height:2;">
+            <div>Phone: <span class="mono" id="dwPhone">—</span></div>
+            <div>Username: <span class="mono" id="dwUsername">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-daysoff"><div class="empty-note">Days-off tracking isn't built yet — coming in a future update.</div></div>
+      <div class="tab-panel" id="tab-sitelog"></div>
+      <div class="tab-panel" id="tab-activity"></div>
+      <div class="tab-panel" id="tab-monthly"></div>
+    </div>
+  </div>
+</div>
 
-  cancelBtn.classList.add("hidden");
-}
+<div id="toast" class="toast hidden"></div>
+<style>
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:100;box-shadow:var(--shadow-lg);}
+.toast-error{background:var(--red);}
+.toast-success{background:var(--green);}
+.hidden{display:none !important;}
+</style>
 
-// ---- Modal helper ----
-function openModal(title, bodyHtml, onConfirm) {
-  document.getElementById("modal-cancel").classList.remove("hidden");
-  document.getElementById("modal-title").textContent = title;
-  document.getElementById("modal-body").innerHTML = bodyHtml;
-  document.getElementById("modal").classList.remove("hidden");
-
-  const confirmBtn = document.getElementById("modal-confirm");
-  const cancelBtn = document.getElementById("modal-cancel");
-
-  const closeModal = () => document.getElementById("modal").classList.add("hidden");
-  const confirmHandler = async () => {
-    setButtonLoading(confirmBtn, true);
-    try {
-      await onConfirm();
-      closeModal();
-    } catch (err) {
-      showToast(err.message, "error");
-    } finally {
-      setButtonLoading(confirmBtn, false);
-    }
-  };
-
-  // Replace nodes to clear any previously-attached listeners.
-  const newConfirm = confirmBtn.cloneNode(true);
-  newConfirm.querySelector(".btn-label").textContent = "Save";
-  confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
-  newConfirm.addEventListener("click", confirmHandler);
-
-  const newCancel = cancelBtn.cloneNode(true);
-  cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
-  newCancel.addEventListener("click", closeModal);
-}
+<script>
+  // Auto-switch: localhost during local dev, Railway URL in production.
+  // Must match index.html's config exactly - without this, api.js silently
+  // falls back to http://localhost:4000/api, which gets blocked as mixed
+  // content on this https page and every API call fails with no status code.
+  window.HTN_API_BASE_URL =
+    (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+      ? "http://localhost:4000/api"
+      : "https://welcoming-blessing-production-6f01.up.railway.app/api";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/admin-dashboard.js"></script>
+</body>
+</html>
