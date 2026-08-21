@@ -3,7 +3,7 @@ function showToast(message, kind = "") {
   const stack = document.getElementById("toast-stack");
   if (!stack) return;
   const toast = document.createElement("div");
-  toast.className = "toast" + (kind ? ` toast-${kind}` : "");
+  toast.className = "toast" + (kind ? " toast-" + kind : "");
   toast.textContent = message;
   stack.appendChild(toast);
   setTimeout(() => toast.remove(), 3200);
@@ -23,6 +23,10 @@ function escapeHtml(str) {
   const d = document.createElement("div");
   d.textContent = str == null ? "" : String(str);
   return d.innerHTML;
+}
+
+function tr(key) {
+  return typeof t === "function" ? t(key) : key;
 }
 
 // ---- App state ----
@@ -81,7 +85,7 @@ async function bootWithRetry(attempt = 1) {
       showReconnectBanner("Can't reach the server. Check your connection and reopen the app.");
       return;
     }
-    showReconnectBanner(`Connecting to server… (attempt ${attempt}/${maxAttempts - 1})`);
+    showReconnectBanner("Connecting to server… (attempt " + attempt + "/" + (maxAttempts - 1) + ")");
     setTimeout(() => bootWithRetry(attempt + 1), attempt * 1500);
   }
 }
@@ -158,6 +162,7 @@ async function enterApp(user) {
   startLocationWatch();
   updateOfflineBadge();
   setupWorkerTabs();
+  if (typeof applyTranslations === "function") applyTranslations();
 }
 
 // ---- Offline badge ----
@@ -167,7 +172,7 @@ async function updateOfflineBadge() {
   try {
     const n = await OfflineQueue.count();
     if (n > 0) {
-      el.textContent = n + " offline";
+      el.textContent = n + " " + tr("offlineBadge");
       el.classList.remove("hidden");
     } else {
       el.classList.add("hidden");
@@ -180,12 +185,12 @@ async function updateOfflineBadge() {
 setInterval(updateOfflineBadge, 8000);
 window.addEventListener("online", () => {
   flushOfflineQueue().then((n) => {
-    if (n > 0) showToast(n + " offline item(s) synced", "success");
+    if (n > 0) showToast(n + " " + tr("syncedItems"), "success");
     updateOfflineBadge();
   });
 });
 
-// ---- Worker tabs (Home / Reports / Alerts / Profile) ----
+// ---- Worker tabs ----
 function setupWorkerTabs() {
   document.querySelectorAll("[data-worker-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -210,7 +215,7 @@ async function loadAttendanceSummary() {
       ? Math.round((summary.daysPresent / summary.daysInMonth) * 100)
       : 0;
     document.getElementById("attendance-days").textContent =
-      summary.daysPresent + " / " + summary.daysInMonth + " days";
+      summary.daysPresent + " / " + summary.daysInMonth + " " + tr("days");
     document.getElementById("attendance-bar-fill").style.width = pct + "%";
     document.getElementById("attendance-month-label").textContent = summary.month;
   } catch {}
@@ -348,12 +353,13 @@ async function loadHistory() {
       const li = document.createElement("li");
       li.className = "history-item";
       const time = new Date(item.created_at).toLocaleString();
-      const typeLabel = item.type === "check_in" ? "Checked in" : "Checked out";
+      const typeLabel = item.type === "check_in" ? tr("checkedIn") : tr("checkedOut");
       const badgeClass = item.status === "inside" ? "badge-inside" : "badge-outside";
+      const statusLabel = item.status === "inside" ? tr("inside") : tr("outside");
       li.innerHTML =
         "<div><div>" + typeLabel + "</div>" +
         "<div class=\"meta\">" + time + " · " + Math.round(item.distance_meters) + "m</div></div>" +
-        "<span class=\"badge " + badgeClass + "\">" + item.status + "</span>";
+        "<span class=\"badge " + badgeClass + "\">" + statusLabel + "</span>";
       list.appendChild(li);
     });
   } catch (err) {
@@ -364,7 +370,7 @@ async function loadHistory() {
 function updateCheckinButton() {
   const button = document.getElementById("checkin-button");
   if (!button) return;
-  button.querySelector(".btn-label").textContent = state.isCheckedIn ? "Check Out" : "Check In";
+  button.querySelector(".btn-label").textContent = state.isCheckedIn ? tr("checkOut") : tr("checkIn");
   button.classList.toggle("checked-in", state.isCheckedIn);
 }
 
@@ -395,7 +401,7 @@ function startLocationWatch() {
     },
     () => {
       const pill = document.getElementById("status-pill");
-      if (pill) pill.textContent = "Location access needed";
+      if (pill) pill.textContent = tr("locationNeeded");
       const btn = document.getElementById("checkin-button");
       if (btn) btn.disabled = true;
     },
@@ -423,7 +429,7 @@ function updateDistanceDisplay() {
 
   if (!pill) return;
   if (!state.currentPosition || !site) {
-    pill.textContent = "Locating…";
+    pill.textContent = tr("locating");
     pill.className = "status-pill status-idle";
     return;
   }
@@ -437,9 +443,8 @@ function updateDistanceDisplay() {
   state.distanceToSite = distance;
   const inside = distance <= site.radius_meters;
 
-  pill.textContent = inside
-    ? "Inside range · " + Math.round(distance) + "m"
-    : "Outside range · " + Math.round(distance) + "m";
+  pill.textContent =
+    (inside ? tr("insideRange") : tr("outsideRange")) + " · " + Math.round(distance) + "m";
   pill.className = "status-pill " + (inside ? "status-inside" : "status-outside");
 
   if (button) button.disabled = false;
@@ -449,7 +454,7 @@ function updateDistanceDisplay() {
 document.getElementById("checkin-button")?.addEventListener("click", async () => {
   const button = document.getElementById("checkin-button");
   if (!state.currentPosition || !state.selectedSiteId) {
-    showToast("Waiting for location…", "error");
+    showToast(tr("waitingLocation"), "error");
     return;
   }
 
@@ -471,7 +476,7 @@ document.getElementById("checkin-button")?.addEventListener("click", async () =>
 
     if (result.offline) {
       vibrate([100]);
-      showToast(result.message, "success");
+      showToast(result.message || tr("offlineQueue"), "success");
       updateOfflineBadge();
       return;
     }
@@ -481,7 +486,7 @@ document.getElementById("checkin-button")?.addEventListener("click", async () =>
     showToast(
       result.flagged
         ? "Recorded, but flagged for review (" + reason + ")."
-        : (result.type === "check_in" ? "Checked in" : "Checked out") + " successfully.",
+        : (result.type === "check_in" ? tr("checkedIn") : tr("checkedOut")),
       result.flagged ? "error" : "success"
     );
 
@@ -500,12 +505,12 @@ document.getElementById("checkin-button")?.addEventListener("click", async () =>
 async function loadMyReports() {
   const list = document.getElementById("reports-list");
   if (!list) return;
-  list.innerHTML = "<li class='meta'>Loading…</li>";
+  list.innerHTML = "<li class='meta'>" + tr("loading") + "</li>";
   try {
     const rows = await Api.myReports();
     list.innerHTML = "";
     if (rows.length === 0) {
-      list.innerHTML = "<li class='meta'>No reports yet.</li>";
+      list.innerHTML = "<li class='meta'>" + tr("noReports") + "</li>";
       return;
     }
     rows.forEach((r) => {
@@ -525,7 +530,7 @@ document.getElementById("submit-report-btn")?.addEventListener("click", async ()
   const title = document.getElementById("report-title")?.value.trim();
   const body = document.getElementById("report-body")?.value.trim();
   if (!title || !body) {
-    showToast("Title and body are required", "error");
+    showToast(tr("titleBodyRequired"), "error");
     return;
   }
   try {
@@ -535,10 +540,10 @@ document.getElementById("submit-report-btn")?.addEventListener("click", async ()
       siteId: state.selectedSiteId || undefined,
     });
     if (result.offline) {
-      showToast(result.message, "success");
+      showToast(result.message || tr("offlineQueue"), "success");
       updateOfflineBadge();
     } else {
-      showToast("Report submitted", "success");
+      showToast(tr("reportSubmitted"), "success");
     }
     document.getElementById("report-title").value = "";
     document.getElementById("report-body").value = "";
@@ -552,12 +557,12 @@ document.getElementById("submit-report-btn")?.addEventListener("click", async ()
 async function loadNotifications() {
   const list = document.getElementById("notifications-list");
   if (!list) return;
-  list.innerHTML = "<li class='meta'>Loading…</li>";
+  list.innerHTML = "<li class='meta'>" + tr("loading") + "</li>";
   try {
     const rows = await Api.getNotifications();
     list.innerHTML = "";
     if (rows.length === 0) {
-      list.innerHTML = "<li class='meta'>No alerts yet.</li>";
+      list.innerHTML = "<li class='meta'>" + tr("noAlerts") + "</li>";
       return;
     }
     rows.forEach((n) => {
@@ -577,7 +582,7 @@ async function loadNotifications() {
 document.getElementById("mark-read-btn")?.addEventListener("click", async () => {
   try {
     await Api.markNotificationsRead();
-    showToast("Marked as read", "success");
+    showToast(tr("markedRead"), "success");
     loadNotifications();
   } catch (err) {
     showToast(err.message, "error");
@@ -603,14 +608,14 @@ document.getElementById("save-profile-btn")?.addEventListener("click", async () 
     const updated = await Api.updateMyProfile({ fullName, phone, locale });
     Auth.setUser(Object.assign({}, Auth.getUser(), updated, { fullName: updated.full_name || fullName }));
     if (typeof setLocale === "function") setLocale(locale);
-    showToast("Profile saved", "success");
+    showToast(tr("profileSaved"), "success");
   } catch (err) {
     showToast(err.message, "error");
   }
 });
 
 document.getElementById("delete-account-btn")?.addEventListener("click", async () => {
-  if (!confirm("Delete your account permanently? This cannot be undone.")) return;
+  if (!confirm(tr("deleteConfirm"))) return;
   try {
     await Api.deleteMyAccount();
     Auth.logout();
