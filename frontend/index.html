@@ -8,7 +8,6 @@
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#F6F8FC" />
 
-<!-- iOS PWA support -->
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="HTN Attendance" />
@@ -19,20 +18,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
 <link rel="stylesheet" href="css/styles.css" />
-
-<!-- Leaflet (free, no API key) — real map + live position -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
 
-<!-- Splash / boot screen -->
 <div id="boot-screen" class="boot-screen">
   <div class="boot-logo">HighTechNour</div>
   <div class="boot-ring"></div>
   <div class="boot-sub">ATTENDANCE</div>
 </div>
 
-<!-- Login screen -->
 <div id="login-screen" class="screen hidden">
   <div class="login-card">
     <div class="brand">
@@ -49,7 +44,10 @@
         <input type="text" id="login-username" autocomplete="username" required />
       </label>
       <label>Password
-        <input type="password" id="login-password" autocomplete="current-password" required />
+        <div class="password-wrap">
+          <input type="password" id="login-password" autocomplete="current-password" required />
+          <button type="button" id="toggle-password" class="icon-button" title="Show password">👁</button>
+        </div>
       </label>
       <button type="submit" id="login-button" class="primary-button">
         <span class="btn-label">Sign In</span>
@@ -60,57 +58,111 @@
   </div>
 </div>
 
-<!-- Employee app screen -->
 <div id="app-screen" class="screen hidden">
   <header class="topbar">
     <div class="topbar-title">HighTechNour</div>
     <div class="topbar-user">
+      <span id="offline-badge" class="offline-badge hidden">0 offline</span>
       <span id="user-name"></span>
       <button id="logout-button" class="icon-button" title="Sign out" aria-label="Sign out">⏻</button>
     </div>
   </header>
 
+  <nav class="worker-tabs">
+    <button class="tab-button active" data-worker-tab="home">Home</button>
+    <button class="tab-button" data-worker-tab="reports">Reports</button>
+    <button class="tab-button" data-worker-tab="alerts">Alerts</button>
+    <button class="tab-button" data-worker-tab="profile">Profile</button>
+  </nav>
+
   <main class="main-content">
-    <div id="device-pending-banner" class="banner banner-warning hidden">
-      Your device is awaiting admin approval. You can't check in until it's approved.
-    </div>
-
-    <div id="assignment-banner" class="banner banner-assignment hidden"></div>
-
-    <div class="map-wrap">
-      <div id="site-map" class="site-map">
-        <div id="site-map-skeleton" class="site-map-skeleton" aria-hidden="true"></div>
+    <!-- HOME -->
+    <div id="panel-home" class="worker-panel">
+      <div id="device-pending-banner" class="banner banner-warning hidden">
+        Your device is awaiting admin approval. You can't check in until it's approved.
       </div>
-      <div id="status-pill" class="status-pill status-idle">Locating…</div>
-    </div>
 
-    <div class="site-select-wrap">
-      <label for="site-select">Site</label>
-      <select id="site-select"></select>
-    </div>
+      <div id="assignment-banner" class="banner banner-assignment hidden"></div>
 
-    <button id="checkin-button" class="primary-button" disabled>
-      <span class="btn-label">Check In</span>
-      <span class="btn-spinner hidden" aria-hidden="true"></span>
-    </button>
-
-    <section class="attendance-summary">
-      <div class="attendance-summary-head">
-        <h2>My Attendance</h2>
-        <span id="attendance-month-label" class="meta"></span>
+      <div class="map-wrap">
+        <div id="site-map" class="site-map">
+          <div id="site-map-skeleton" class="site-map-skeleton" aria-hidden="true"></div>
+        </div>
+        <div id="status-pill" class="status-pill status-idle">Locating…</div>
       </div>
-      <div id="attendance-days" class="attendance-days">—</div>
-      <div class="attendance-bar"><div id="attendance-bar-fill" class="attendance-bar-fill"></div></div>
-    </section>
 
-    <section class="history">
-      <h2>Recent Activity</h2>
-      <ul id="history-list" class="history-list"></ul>
-    </section>
+      <div class="site-select-wrap">
+        <label for="site-select">Site</label>
+        <select id="site-select"></select>
+      </div>
+
+      <button id="checkin-button" class="primary-button" disabled>
+        <span class="btn-label">Check In</span>
+        <span class="btn-spinner hidden" aria-hidden="true"></span>
+      </button>
+
+      <section class="attendance-summary">
+        <div class="attendance-summary-head">
+          <h2>My Attendance</h2>
+          <span id="attendance-month-label" class="meta"></span>
+        </div>
+        <div id="attendance-days" class="attendance-days">—</div>
+        <div class="attendance-bar"><div id="attendance-bar-fill" class="attendance-bar-fill"></div></div>
+      </section>
+
+      <section class="history">
+        <h2>Recent Activity</h2>
+        <ul id="history-list" class="history-list"></ul>
+      </section>
+    </div>
+
+    <!-- REPORTS -->
+    <div id="panel-reports" class="worker-panel hidden">
+      <h2>Field Report</h2>
+      <label>Title
+        <input type="text" id="report-title" maxlength="120" placeholder="What happened?" />
+      </label>
+      <label>Details
+        <textarea id="report-body" rows="4" maxlength="4000" placeholder="Describe the situation on site…"></textarea>
+      </label>
+      <button id="submit-report-btn" class="primary-button">Submit report</button>
+
+      <section class="history" style="margin-top:1.5rem">
+        <h2>My reports</h2>
+        <ul id="reports-list" class="history-list"></ul>
+      </section>
+    </div>
+
+    <!-- ALERTS -->
+    <div id="panel-alerts" class="worker-panel hidden">
+      <div class="button-row" style="justify-content:space-between;align-items:center">
+        <h2 style="margin:0">Alerts</h2>
+        <button id="mark-read-btn" class="secondary-button">Mark all read</button>
+      </div>
+      <ul id="notifications-list" class="history-list" style="margin-top:1rem"></ul>
+    </div>
+
+    <!-- PROFILE -->
+    <div id="panel-profile" class="worker-panel hidden">
+      <h2>Profile</h2>
+      <label>Full name
+        <input type="text" id="profile-name" />
+      </label>
+      <label>Phone
+        <input type="text" id="profile-phone" />
+      </label>
+      <label>Language
+        <select id="profile-locale">
+          <option value="en">English</option>
+          <option value="ar">العربية</option>
+        </select>
+      </label>
+      <button id="save-profile-btn" class="primary-button">Save</button>
+      <button id="delete-account-btn" class="secondary-button" style="margin-top:1rem;color:#b91c1c">Delete my account</button>
+    </div>
   </main>
 </div>
 
-<!-- Admin dashboard screen -->
 <div id="admin-screen" class="screen hidden">
   <header class="topbar">
     <div class="topbar-title">HighTechNour · Admin</div>
@@ -134,26 +186,22 @@
       <h2>Flagged Check-ins</h2>
       <ul id="flagged-list" class="admin-list"></ul>
     </section>
-
     <section id="tab-team" class="tab-panel hidden">
       <h2>Team</h2>
       <button id="add-user-button" class="secondary-button">+ Add Worker</button>
       <ul id="team-list" class="admin-list"></ul>
     </section>
-
     <section id="tab-workers" class="tab-panel hidden">
       <h2>Workers</h2>
       <label>Month <input type="month" id="workers-month" /></label>
       <ul id="workers-list" class="admin-list"></ul>
     </section>
-
     <section id="tab-assignments" class="tab-panel hidden">
       <h2>Assignments</h2>
       <label>Date <input type="date" id="assignments-date" /></label>
       <button id="add-assignment-button" class="secondary-button">+ Assign Worker</button>
       <ul id="assignments-list" class="admin-list"></ul>
     </section>
-
     <section id="tab-sites" class="tab-panel hidden">
       <h2>Sites</h2>
       <div class="button-row">
@@ -162,7 +210,6 @@
       </div>
       <ul id="sites-list" class="admin-list"></ul>
     </section>
-
     <section id="tab-export" class="tab-panel hidden">
       <h2>Export Report</h2>
       <label>Start Date <input type="date" id="export-start" /></label>
@@ -175,7 +222,6 @@
   </main>
 </div>
 
-<!-- Simple modal used for add-user / add-site forms -->
 <div id="modal" class="modal hidden">
   <div class="modal-card">
     <h3 id="modal-title"></h3>
@@ -190,12 +236,9 @@
   </div>
 </div>
 
-<!-- Toast stack — supports multiple toasts queued without overwriting -->
 <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
 
 <script>
-  // Auto-switch: localhost during local dev, Railway URL in production.
-  // No manual toggling needed before deploys.
   window.HTN_API_BASE_URL =
     (location.hostname === "localhost" || location.hostname === "127.0.0.1")
       ? "http://localhost:4000/api"
@@ -203,7 +246,16 @@
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/api.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/app.js"></script>
 <script src="js/admin.js"></script>
+<script>
+  // Password show/hide
+  document.getElementById("toggle-password")?.addEventListener("click", () => {
+    const input = document.getElementById("login-password");
+    if (!input) return;
+    input.type = input.type === "password" ? "text" : "password";
+  });
+</script>
 </body>
 </html>
