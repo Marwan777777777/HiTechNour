@@ -9,6 +9,7 @@ const siteRoutes = require("./routes/sites");
 const checkinRoutes = require("./routes/checkins");
 const assignmentRoutes = require("./routes/assignments");
 const skillRoutes = require("./routes/skills");
+const reportRoutes = require("./routes/reports");
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use("/api/sites", siteRoutes);
 app.use("/api/checkins", checkinRoutes);
 app.use("/api/assignments", assignmentRoutes);
 app.use("/api/skills", skillRoutes);
+app.use("/api/reports", reportRoutes);
 
 // 404 handler
 app.use((req, res) => {
