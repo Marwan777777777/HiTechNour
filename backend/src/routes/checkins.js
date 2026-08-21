@@ -187,7 +187,7 @@ router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const flaggedOnly = req.query.flagged === "true";
     const { rows } = await pool.query(
-      `SELECT c.id, u.full_name, u.username, s.name AS site_name, c.type, c.lat, c.lng,
+      `SELECT c.id, c.user_id, u.full_name, u.username, s.name AS site_name, c.type, c.lat, c.lng,
               c.distance_meters, c.status, c.device_matched, c.is_mock_location, c.is_off_hours,
               c.flagged, c.flag_reason, c.reviewed, c.created_at
        FROM checkins c
