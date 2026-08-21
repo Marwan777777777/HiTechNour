@@ -275,9 +275,24 @@
         <div class="classic-note">CSV export by date range is on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
         <div style="padding:30px;text-align:center;color:var(--ink-faint);">Per-worker and per-site exportable reports — coming to this dashboard next.</div>
       </div></div></div>
-      <div class="page" id="page-devices"><div class="panel"><div class="panel-body">
-        <div class="classic-note">Device approvals/resets are on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
-      </div></div></div>
+      <div class="page" id="page-devices">
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-body" style="display:flex;gap:12px;align-items:center;">
+            <input type="text" id="devSearch" placeholder="Search workers…" style="flex:1;border:1px solid var(--line-strong);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" />
+            <span id="devPendingBadge" class="nav-badge hidden" style="position:static;"></span>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Device Bindings</h3></div>
+          <div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;">
+            <table>
+              <thead><tr><th>Worker</th><th>Status</th><th>Bound Since</th><th></th></tr></thead>
+              <tbody id="devTableBody"></tbody>
+            </table>
+            <div id="devEmpty" class="empty-note hidden">No workers match this search.</div>
+          </div>
+        </div>
+      </div>
       <div class="page" id="page-settings"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Geofence radius, work hours, and account settings — coming to this dashboard next.</div></div></div>
 
     </div>
