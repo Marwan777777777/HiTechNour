@@ -32,31 +32,72 @@
 </div>
 
 <div id="login-screen" class="screen hidden">
-  <div class="login-card">
-    <div class="lang-row">
-      <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
-    </div>
-    <div class="brand">
-      <img class="brand-logo-img" src="icons/logo.svg" alt="HiTechNour" />
-      <h1 data-i18n="appName">HiTechNour</h1>
-      <p class="brand-sub" data-i18n="siteAttendance">Site Attendance</p>
-    </div>
-    <form id="login-form">
-      <label><span data-i18n="username">Username</span>
-        <input type="text" id="login-username" autocomplete="username" required />
-      </label>
-      <label><span data-i18n="password">Password</span>
-        <div class="password-wrap">
-          <input type="password" id="login-password" autocomplete="current-password" required />
-          <button type="button" id="toggle-password" class="icon-button" title="Show password">👁</button>
+  <div class="login-shell">
+    <div class="login-visual" aria-hidden="true">
+      <div class="login-visual-grid"></div>
+      <div class="login-visual-glow"></div>
+      <div class="login-visual-content">
+        <div class="login-brand-lockup">
+          <img src="icons/logo.svg" alt="" />
+          <div>
+            <strong>HiTechNour</strong>
+            <span>Operations</span>
+          </div>
         </div>
-      </label>
-      <button type="submit" id="login-button" class="primary-button">
-        <span class="btn-label" data-i18n="signIn">Sign In</span>
-        <span class="btn-spinner hidden" aria-hidden="true"></span>
-      </button>
-      <p id="login-error" class="error-text hidden"></p>
-    </form>
+        <div class="login-visual-copy">
+          <span class="eyebrow">SITE ATTENDANCE</span>
+          <h2>One place to manage<br />every working day.</h2>
+          <p>Secure attendance, site visibility and workforce operations in one focused workspace.</p>
+        </div>
+        <div class="login-visual-points">
+          <span><i></i>Verified site attendance</span>
+          <span><i></i>Location-aware operations</span>
+          <span><i></i>Built for your workforce</span>
+        </div>
+      </div>
+      <div class="login-visual-footer">HITECHNOUR · ATTENDANCE PLATFORM</div>
+    </div>
+
+    <div class="login-panel">
+      <div class="login-panel-top">
+        <div class="login-mobile-brand">
+          <img src="icons/logo.svg" alt="HiTechNour" />
+          <span>HiTechNour</span>
+        </div>
+        <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
+      </div>
+
+      <div class="login-heading">
+        <span class="login-kicker">WELCOME BACK</span>
+        <h1>Sign in to continue</h1>
+        <p>Use your HiTechNour account to access attendance.</p>
+      </div>
+
+      <form id="login-form">
+        <label><span data-i18n="username">Username</span>
+          <input type="text" id="login-username" autocomplete="username" required />
+        </label>
+        <label><span data-i18n="password">Password</span>
+          <div class="password-wrap">
+            <input type="password" id="login-password" autocomplete="current-password" required />
+            <button type="button" id="toggle-password" class="icon-button" title="Show password" aria-label="Show password">👁</button>
+          </div>
+        </label>
+        <div class="login-meta-row">
+          <span class="login-security-note"><i></i> Secure sign in</span>
+        </div>
+        <button type="submit" id="login-button" class="primary-button">
+          <span class="btn-label" data-i18n="signIn">Sign In</span>
+          <span class="btn-spinner hidden" aria-hidden="true"></span>
+        </button>
+        <p id="login-error" class="error-text hidden"></p>
+      </form>
+
+      <div class="login-footer">
+        <span>HiTechNour Attendance</span>
+        <span>Secure workforce access</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -185,7 +226,11 @@
   document.getElementById("toggle-password")?.addEventListener("click", () => {
     const input = document.getElementById("login-password");
     if (!input) return;
-    input.type = input.type === "password" ? "text" : "password";
+    const isPassword = input.type === "password";
+    input.type = isPassword ? "text" : "password";
+    const button = document.getElementById("toggle-password");
+    button?.setAttribute("aria-label", isPassword ? "Hide password" : "Show password");
+    button?.setAttribute("title", isPassword ? "Hide password" : "Show password");
   });
 </script>
 </body>
