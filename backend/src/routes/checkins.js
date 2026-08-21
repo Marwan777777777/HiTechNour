@@ -19,11 +19,26 @@ function isOffHours(date) {
   return hour < WORK_HOURS_START || hour >= WORK_HOURS_END;
 }
 
+async function notifyAdmins(title, body, kind) {
+  try {
+    const { rows: admins } = await pool.query(
+      `SELECT id FROM users WHERE role = 'admin' AND active = true`
+    );
+    for (const a of admins) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, title, body, kind) VALUES ($1, $2, $3, $4)`,
+        [a.id, title, body, kind]
+      );
+    }
+  } catch (_) {
+    // never fail the check-in because of notification
+  }
+}
+
 router.post("/", requireAuth, checkinLimiter, async (req, res, next) => {
   try {
     const { siteId, lat, lng, accuracyMeters, deviceId, isMockLocation, type } = req.body;
 
-    // ---- Input validation ----
     if (!siteId || !isValidLat(lat) || !isValidLng(lng) || !isNonEmptyString(deviceId, 200)) {
       return res.status(400).json({ error: "siteId, valid lat/lng, and deviceId are required." });
     }
@@ -35,23 +50,18 @@ router.post("/", requireAuth, checkinLimiter, async (req, res, next) => {
     }
 
     const siteResult = await pool.query(
-      "SELECT id, lat, lng, radius_meters FROM sites WHERE id = $1 AND active = true",
+      "SELECT id, name, lat, lng, radius_meters FROM sites WHERE id = $1 AND active = true",
       [siteId]
     );
     const site = siteResult.rows[0];
     if (!site) return res.status(404).json({ error: "Site not found." });
 
     const userResult = await pool.query(
-      "SELECT id, device_id, pending_device_id FROM users WHERE id = $1",
+      "SELECT id, device_id, pending_device_id, full_name, username FROM users WHERE id = $1",
       [req.user.id]
     );
     const user = userResult.rows[0];
 
-    // ---- Device binding (with admin-approval workflow) ----
-    // No device bound yet: register this device as PENDING and require an
-    // admin to approve it before any check-in is accepted. This is what
-    // closes the race condition where anyone holding the password could
-    // become the "trusted" device just by checking in first.
     let deviceMatched = true;
     if (!user.device_id) {
       if (!user.pending_device_id) {
@@ -72,11 +82,9 @@ router.post("/", requireAuth, checkinLimiter, async (req, res, next) => {
       }
     }
 
-    // ---- Distance - computed server-side, the client's opinion is ignored ----
     const distance = haversineMeters(lat, lng, site.lat, site.lng);
     const status = distance <= site.radius_meters ? "inside" : "outside";
 
-    // ---- Impossible travel check against this user's last event ----
     const prevResult = await pool.query(
       "SELECT lat, lng, created_at FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
       [user.id]
@@ -87,7 +95,6 @@ router.post("/", requireAuth, checkinLimiter, async (req, res, next) => {
     const lowAccuracy =
       accuracyMeters != null && accuracyMeters > MAX_ACCEPTABLE_ACCURACY_METERS;
 
-    // A check-out with no open check-in is worth a human glance, not a block.
     let checkoutWithoutCheckin = false;
     if (checkinType === "check_out") {
       const lastEventResult = await pool.query(
@@ -147,14 +154,21 @@ router.post("/", requireAuth, checkinLimiter, async (req, res, next) => {
       ]
     );
 
+    const workerName = user.full_name || user.username;
+    const action = checkinType === "check_out" ? "checked out" : "checked in";
+    const flagNote = flagged ? ` · FLAG: ${(flagReason || "").replace(/_/g, " ")}` : "";
+    await notifyAdmins(
+      `${workerName} ${action}`,
+      `${site.name} · ${status}${flagNote}`,
+      flagged ? "flag" : "checkin"
+    );
+
     res.status(201).json(inserted.rows[0]);
   } catch (err) {
     next(err);
   }
 });
 
-// A user's own recent check-ins/outs, plus whether they currently have an
-// open shift (last event was a check_in with no matching check_out yet).
 router.get("/me", requireAuth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -169,9 +183,6 @@ router.get("/me", requireAuth, async (req, res, next) => {
   }
 });
 
-// Worker: their own "days present this month" - the same number the admin
-// sees on the worker-detail dashboard, so there's no room for it to look
-// different depending on who's asking. ?month=YYYY-MM, defaults to current.
 router.get("/me/summary", requireAuth, async (req, res, next) => {
   try {
     const summary = await getMonthlyAttendance(req.user.id, req.query.month);
@@ -181,8 +192,6 @@ router.get("/me/summary", requireAuth, async (req, res, next) => {
   }
 });
 
-// Admin: full log, optionally filtered to flagged-and-unreviewed only
-// (the actual review queue - reviewed items drop out automatically).
 router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const flaggedOnly = req.query.flagged === "true";
@@ -203,7 +212,6 @@ router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
   }
 });
 
-// Admin: mark a flagged entry as reviewed so the queue doesn't grow forever.
 router.patch("/:id/review", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -218,7 +226,6 @@ router.patch("/:id/review", requireAuth, requireAdmin, async (req, res, next) =>
   }
 });
 
-// Admin: CSV export for a date range, e.g. for payroll.
 router.get("/export", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
@@ -239,17 +246,18 @@ router.get("/export", requireAuth, requireAdmin, async (req, res, next) => {
     const escapeCsv = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
     let csv = "Full Name,Username,Site,Type,Status,Distance (m),Flagged,Flag Reason,Timestamp\n";
     for (const r of rows) {
-      csv += [
-        escapeCsv(r.full_name),
-        escapeCsv(r.username),
-        escapeCsv(r.site),
-        escapeCsv(r.type),
-        escapeCsv(r.status),
-        r.distance_meters,
-        r.flagged,
-        escapeCsv(r.flag_reason),
-        escapeCsv(r.created_at.toISOString()),
-      ].join(",") + "\n";
+      csv +=
+        [
+          escapeCsv(r.full_name),
+          escapeCsv(r.username),
+          escapeCsv(r.site),
+          escapeCsv(r.type),
+          escapeCsv(r.status),
+          r.distance_meters,
+          r.flagged,
+          escapeCsv(r.flag_reason),
+          escapeCsv(r.created_at.toISOString()),
+        ].join(",") + "\n";
     }
 
     res.setHeader("Content-Type", "text/csv");
