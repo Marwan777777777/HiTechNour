@@ -20,7 +20,10 @@ async function applyMigrations() {
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0"
   );
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS title TEXT");
-  console.log("[migrate] Ensured token_version and title columns exist.");
+  await pool.query(
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS locale TEXT NOT NULL DEFAULT 'en'"
+  );
+  console.log("[migrate] Ensured token_version, title and locale columns exist.");
 
   const { rows } = await pool.query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
   if (rows.length === 0) {
