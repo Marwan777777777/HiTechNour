@@ -8,6 +8,7 @@ function showToast(message, kind = "") {
   stack.appendChild(toast);
   setTimeout(() => toast.remove(), 3200);
 }
+window.showToast = showToast;
 
 function vibrate(pattern) {
   if ("vibrate" in navigator) navigator.vibrate(pattern);
@@ -22,13 +23,14 @@ function showScreen(id) {
 const state = {
   sites: [],
   selectedSiteId: null,
-  currentPosition: null, // { lat, lng, accuracy }
+  currentPosition: null,
   distanceToSite: null,
   isCheckedIn: false,
   map: null,
   workerMarker: null,
   siteMarker: null,
   geofenceCircle: null,
+  workerTab: "home",
 };
 
 // ---- Boot ----
@@ -49,13 +51,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootWithRetry();
 });
 
-// A slept/cold-starting backend (Railway "Serverless", or a sleeping Neon
-// DB) can make the very first request after idle time fail or hang for
-// 20-50s. That is NOT the same thing as "not logged in" - a valid token
-// should never be treated as invalid just because the server was briefly
-// unreachable. Retry a few times with backoff before giving up, and only
-// fall back to the login screen if the token is genuinely rejected (401 -
-// Api.me() throws) or every retry truly fails.
 async function bootWithRetry(attempt = 1) {
   const maxAttempts = 4;
   const stayClassic = new URLSearchParams(location.search).get("classic") === "1";
@@ -70,10 +65,6 @@ async function bootWithRetry(attempt = 1) {
       await enterApp(me);
     }
   } catch (err) {
-    // A real auth failure (bad/expired token, disabled account) already
-    // triggers Auth.logout() + reload inside apiRequest's 401 branch -
-    // if we get here with a token still in storage, this was a network/
-    // server-availability failure, not a login failure.
     if (!Auth.getToken()) {
       document.getElementById("boot-screen").classList.add("hidden");
       showScreen("login-screen");
@@ -136,7 +127,7 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   }
 });
 
-document.getElementById("logout-button").addEventListener("click", () => {
+document.getElementById("logout-button")?.addEventListener("click", () => {
   Auth.logout();
   window.location.reload();
 });
@@ -149,7 +140,7 @@ async function enterApp(user) {
   try {
     const me = await Api.me();
     if (me.devicePending) {
-      document.getElementById("device-pending-banner").classList.remove("hidden");
+      document.getElementById("device-pending-banner")?.classList.remove("hidden");
     }
   } catch {}
 
@@ -159,9 +150,53 @@ async function enterApp(user) {
   await loadHistory();
   await loadAttendanceSummary();
   startLocationWatch();
+  updateOfflineBadge();
+  setupWorkerTabs();
 }
 
-// ---- My Attendance (days present this month) ----
+// ---- Offline badge ----
+async function updateOfflineBadge() {
+  const el = document.getElementById("offline-badge");
+  if (!el) return;
+  try {
+    const n = await OfflineQueue.count();
+    if (n > 0) {
+      el.textContent = `${n} offline`;
+      el.classList.remove("hidden");
+    } else {
+      el.classList.add("hidden");
+    }
+  } catch {
+    el.classList.add("hidden");
+  }
+}
+
+setInterval(updateOfflineBadge, 8000);
+window.addEventListener("online", () => {
+  flushOfflineQueue().then((n) => {
+    if (n > 0) showToast(`${n} offline item(s) synced`, "success");
+    updateOfflineBadge();
+  });
+});
+
+// ---- Worker tabs (Home / Reports / Alerts / Profile) ----
+function setupWorkerTabs() {
+  document.querySelectorAll("[data-worker-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tab = btn.getAttribute("data-worker-tab");
+      state.workerTab = tab;
+      document.querySelectorAll("[data-worker-tab]").forEach((b) => b.classList.toggle("active", b === btn));
+      document.querySelectorAll(".worker-panel").forEach((p) => p.classList.add("hidden"));
+      document.getElementById(`panel-${tab}`)?.classList.remove("hidden");
+
+      if (tab === "reports") loadMyReports();
+      if (tab === "alerts") loadNotifications();
+      if (tab === "profile") loadProfileForm();
+    });
+  });
+}
+
+// ---- My Attendance ----
 async function loadAttendanceSummary() {
   try {
     const summary = await Api.myAttendanceSummary();
@@ -172,18 +207,12 @@ async function loadAttendanceSummary() {
       `${summary.daysPresent} / ${summary.daysInMonth} days`;
     document.getElementById("attendance-bar-fill").style.width = `${pct}%`;
     document.getElementById("attendance-month-label").textContent = summary.month;
-  } catch {
-    // Non-critical - if this fails, leave the placeholder text in place
-    // rather than blocking the rest of the app screen.
-  }
+  } catch {}
 }
 
-// ---- Live map ----
-// Free dark-styled tiles (CARTO "dark_all", no API key required) so the map
-// matches the navy/amber theme instead of looking like a default light map.
+// ---- Map ----
 function initMap() {
-  if (state.map) return; // already initialized (e.g. re-entering app screen)
-
+  if (state.map) return;
   if (typeof L === "undefined") {
     const container = document.getElementById("site-map");
     if (container) container.textContent = "Map failed to load — check your connection.";
@@ -193,12 +222,12 @@ function initMap() {
   state.map = L.map("site-map", {
     zoomControl: true,
     attributionControl: true,
-  }).setView([30.0561, 31.3395], 14); // Nasr City, Cairo default until we have a fix
+  }).setView([30.0561, 31.3395], 14);
 
   L.tileLayer(
     "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
     {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
       maxZoom: 19,
       subdomains: "abcd",
     }
@@ -228,13 +257,9 @@ function initMap() {
     fillOpacity: 0.08,
   });
 
-  // Leaflet sizes itself from the container at creation time - if any CSS
-  // transition/animation was still settling, the map can render at the
-  // wrong size. One safety recalculation after layout settles fixes that.
   setTimeout(() => state.map && state.map.invalidateSize(), 200);
 }
 
-// Move the site marker + geofence circle to the currently selected site.
 function updateSiteOnMap() {
   if (!state.map) return;
   const site = state.sites.find((s) => s.id === state.selectedSiteId);
@@ -244,8 +269,6 @@ function updateSiteOnMap() {
   state.siteMarker.setLatLng(latlng).addTo(state.map);
   state.geofenceCircle.setLatLng(latlng).setRadius(site.radius_meters || 200).addTo(state.map);
 
-  // Only auto-fit the view the first time a site appears (avoids yanking
-  // the map around under the worker's finger while they're panning/zooming).
   if (!state._sitePlaced) {
     state._sitePlaced = true;
     fitMapToMarkers();
@@ -263,15 +286,13 @@ function fitMapToMarkers() {
 
 async function loadTodayAssignment() {
   const banner = document.getElementById("assignment-banner");
+  if (!banner) return;
   try {
     const assignments = await Api.myAssignmentToday();
     if (assignments.length === 0) {
       banner.classList.add("hidden");
-      return; // no assignment today - worker picks from the full site list as before
+      return;
     }
-    // Pre-select the assigned site so check-in is one tap, not a dropdown
-    // hunt. If there's more than one (rare handoff day), default to the
-    // first but leave the dropdown open so they can switch.
     state.selectedSiteId = assignments[0].site_id;
     const select = document.getElementById("site-select");
     if (select) select.value = String(assignments[0].site_id);
@@ -290,6 +311,7 @@ async function loadSites() {
   try {
     state.sites = await Api.getSites();
     const select = document.getElementById("site-select");
+    if (!select) return;
     select.innerHTML = "";
     state.sites.forEach((site) => {
       const opt = document.createElement("option");
@@ -314,6 +336,7 @@ async function loadHistory() {
     updateCheckinButton();
 
     const list = document.getElementById("history-list");
+    if (!list) return;
     list.innerHTML = "";
     result.history.forEach((item) => {
       const li = document.createElement("li");
@@ -337,6 +360,7 @@ async function loadHistory() {
 
 function updateCheckinButton() {
   const button = document.getElementById("checkin-button");
+  if (!button) return;
   button.querySelector(".btn-label").textContent = state.isCheckedIn ? "Check Out" : "Check In";
   button.classList.toggle("checked-in", state.isCheckedIn);
 }
@@ -346,8 +370,6 @@ function startLocationWatch() {
     showToast("Location isn't available on this device/browser.", "error");
     return;
   }
-  // watchPosition triggers the permission prompt once; after "Allow" the
-  // browser remembers it for this site and stops asking.
   navigator.geolocation.watchPosition(
     (position) => {
       const firstFix = !state.currentPosition;
@@ -369,8 +391,10 @@ function startLocationWatch() {
       updateDistanceDisplay();
     },
     () => {
-      document.getElementById("status-pill").textContent = "Location access needed";
-      document.getElementById("checkin-button").disabled = true;
+      const pill = document.getElementById("status-pill");
+      if (pill) pill.textContent = "Location access needed";
+      const btn = document.getElementById("checkin-button");
+      if (btn) btn.disabled = true;
     },
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
   );
@@ -394,6 +418,7 @@ function updateDistanceDisplay() {
 
   updateSiteOnMap();
 
+  if (!pill) return;
   if (!state.currentPosition || !site) {
     pill.textContent = "Locating…";
     pill.className = "status-pill status-idle";
@@ -414,12 +439,11 @@ function updateDistanceDisplay() {
     : `Outside range · ${Math.round(distance)}m`;
   pill.className = `status-pill ${inside ? "status-inside" : "status-outside"}`;
 
-  // Client-side distance is shown for the worker's own feedback only - the
-  // server independently recomputes it and is the source of truth.
-  button.disabled = false;
+  if (button) button.disabled = false;
 }
 
-document.getElementById("checkin-button").addEventListener("click", async () => {
+// ---- Check-in with offline support ----
+document.getElementById("checkin-button")?.addEventListener("click", async () => {
   const button = document.getElementById("checkin-button");
   if (!state.currentPosition || !state.selectedSiteId) {
     showToast("Waiting for location…", "error");
@@ -430,20 +454,29 @@ document.getElementById("checkin-button").addEventListener("click", async () => 
   button.classList.add("is-loading");
 
   try {
-    const result = await Api.checkIn({
+    const payload = {
       siteId: state.selectedSiteId,
       lat: state.currentPosition.lat,
       lng: state.currentPosition.lng,
       accuracyMeters: state.currentPosition.accuracy,
       deviceId: getDeviceId(),
-      isMockLocation: false, // wire up Android mock-location detection in a native wrapper if/when you build one
+      isMockLocation: false,
       type: state.isCheckedIn ? "check_out" : "check_in",
-    });
+    };
+
+    const result = await checkInWithOffline(payload);
+
+    if (result.offline) {
+      vibrate([100]);
+      showToast(result.message, "success");
+      updateOfflineBadge();
+      return;
+    }
 
     vibrate(result.flagged ? [200] : [100, 50, 100]);
     showToast(
       result.flagged
-        ? `Recorded, but flagged for review (${result.flag_reason.replace(/_/g, " ")}).`
+        ? `Recorded, but flagged for review (${(result.flag_reason || "").replace(/_/g, " ")}).`
         : `${result.type === "check_in" ? "Checked in" : "Checked out"} successfully.`,
       result.flagged ? "error" : "success"
     );
@@ -455,6 +488,144 @@ document.getElementById("checkin-button").addEventListener("click", async () => 
   } finally {
     button.disabled = false;
     button.classList.remove("is-loading");
-    updateCheckinButton(); // loadHistory() already refreshed state.isCheckedIn
+    updateCheckinButton();
   }
 });
+
+// ---- Reports panel ----
+async function loadMyReports() {
+  const list = document.getElementById("reports-list");
+  if (!list) return;
+  list.innerHTML = "<li class='meta'>Loading…</li>";
+  try {
+    const rows = await Api.myReports();
+    list.innerHTML = "";
+    if (rows.length === 0) {
+      list.innerHTML = "<li class='meta'>No reports yet.</li>";
+      return;
+    }
+    rows.forEach((r) => {
+      const li = document.createElement("li");
+      li.className = "history-item";
+      li.innerHTML = `
+        <div>
+          <div><strong>${escapeHtml(r.title)}</strong></div>
+          <div class="meta">${new Date(r.created_at).toLocaleString()} · ${r.status}</div>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+  } catch (err) {
+    list.innerHTML = `<li class='meta'>${escapeHtml(err.message)}</li>`;
+  }
+}
+
+document.getElementById("submit-report-btn")?.addEventListener("click", async () => {
+  const title = document.getElementById("report-title")?.value.trim();
+  const body = document.getElementById("report-body")?.value.trim();
+  if (!title || !body) {
+    showToast("Title and body are required", "error");
+    return;
+  }
+  try {
+    const result = await submitReportWithOffline({
+      title,
+      body,
+      siteId: state.selectedSiteId || undefined,
+    });
+    if (result.offline) {
+      showToast(result.message, "success");
+      updateOfflineBadge();
+    } else {
+      showToast("Report submitted", "success");
+    }
+    document.getElementById("report-title").value = "";
+    document.getElementById("report-body").value = "";
+    loadMyReports();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+});
+
+// ---- Notifications / Alerts panel ----
+async function loadNotifications() {
+  const list = document.getElementById("notifications-list");
+  if (!list) return;
+  list.innerHTML = "<li class='meta'>Loading…</li>";
+  try {
+    const rows = await Api.getNotifications();
+    list.innerHTML = "";
+    if (rows.length === 0) {
+      list.innerHTML = "<li class='meta'>No alerts yet.</li>";
+      return;
+    }
+    rows.forEach((n) => {
+      const li = document.createElement("li");
+      li.className = "history-item" + (n.read ? "" : " unread");
+      li.innerHTML = `
+        <div>
+          <div><strong>${escapeHtml(n.title)}</strong></div>
+          <div class="meta">${escapeHtml(n.body)}</div>
+          <div class="meta">${new Date(n.created_at).toLocaleString()}</div>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+  } catch (err) {
+    list.innerHTML = `<li class='meta'>${escapeHtml(err.message)}</li>`;
+  }
+}
+
+document.getElementById("mark-read-btn")?.addEventListener("click", async () => {
+  try {
+    await Api.markNotificationsRead();
+    showToast("Marked as read", "success");
+    loadNotifications();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+});
+
+// ---- Profile panel ----
+function loadProfileForm() {
+  const user = Auth.getUser() || {};
+  const nameEl = document.getElementById("profile-name");
+  const phoneEl = document.getElementById("profile-phone");
+  const localeEl = document.getElementById("profile-locale");
+  if (nameEl) nameEl.value = user.fullName || user.full_name || "";
+  if (phoneEl) phoneEl.value = user.phone || "";
+  if (localeEl) localeEl.value = localStorage.getItem("htn_locale") || "en";
+}
+
+document.getElementById("save-profile-btn")?.addEventListener("click", async () => {
+  const fullName = document.getElementById("profile-name")?.value.trim();
+  const phone = document.getElementById("profile-phone")?.value.trim();
+  const locale = document.getElementById("profile-locale")?.value;
+  try {
+    const updated = await Api.updateMyProfile({ fullName, phone, locale });
+    Auth.setUser({ ...Auth.getUser(), ...updated, fullName: updated.full_name || fullName });
+    if (typeof setLocale === "function") setLocale(locale);
+    showToast("Profile saved", "success");
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+});
+
+document.getElementById("delete-account-btn")?.addEventListener("click", async () => {
+  if (!confirm("Delete your account permanently? This cannot be undone.")) return;
+  try {
+    await Api.deleteMyAccount();
+    Auth.logout();
+    window.location.reload();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+});
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """);
+}
