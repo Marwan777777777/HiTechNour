@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>HighTechNour — Admin Dashboard</title>
+<title>HiTechNour — Admin</title>
+<link rel="icon" type="image/png" href="icons/icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/admin-dashboard.css" />
@@ -16,6 +17,8 @@
 .lang-toggle:hover{border-color:var(--blue,#2557D6);color:var(--blue,#2557D6);}
 .drawer-overlay.open{display:flex;}
 .drawer-overlay{display:none;}
+.brand-mark-img{width:36px;height:36px;border-radius:9px;object-fit:contain;background:#fff;}
+.brand-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.02em;}
 </style>
 </head>
 <body>
@@ -26,9 +29,9 @@
 
   <div class="sidebar" id="sidebar">
     <div class="brand">
-      <div class="brand-mark">H</div>
+      <img class="brand-mark-img" src="icons/logo-htn.png" alt="HTN" onerror="this.outerHTML='<div class=brand-mark>H</div>'" />
       <div>
-        <div class="brand-name">HIGHTECHNOUR</div>
+        <div class="brand-name">HiTechNour</div>
         <div class="brand-sub">Attendance</div>
       </div>
     </div>
@@ -123,200 +126,63 @@
     </div>
 
     <div class="content">
-
       <div class="page active" id="page-overview">
         <div class="kpi-row">
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-icon" style="background:var(--blue-wash);color:var(--blue);">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-              </div>
-              <div class="kpi-label">Total Workers</div>
-            </div>
-            <div class="kpi-value" id="kpiTotal">—</div>
-            <div class="kpi-sub" id="kpiTotalSub">&nbsp;</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-icon" style="background:var(--green-wash);color:var(--green);">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
-              </div>
-              <div class="kpi-label">Present Today</div>
-            </div>
-            <div class="kpi-value" id="kpiPresent">—</div>
-            <div class="kpi-sub" id="kpiPresentSub">&nbsp;</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-icon" style="background:var(--amber-wash);color:var(--amber);">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-              </div>
-              <div class="kpi-label">Late</div>
-            </div>
-            <div class="kpi-value" id="kpiLate">—</div>
-            <div class="kpi-sub" id="kpiLateSub">&nbsp;</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-icon" style="background:var(--red-wash);color:var(--red);">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
-              </div>
-              <div class="kpi-label">Absent</div>
-            </div>
-            <div class="kpi-value" id="kpiAbsent">—</div>
-            <div class="kpi-sub" id="kpiAbsentSub">&nbsp;</div>
-          </div>
+          <div class="kpi-card"><div class="kpi-top"><div class="kpi-icon" style="background:var(--blue-wash);color:var(--blue);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div class="kpi-label">Total Workers</div></div><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-sub" id="kpiTotalSub">&nbsp;</div></div>
+          <div class="kpi-card"><div class="kpi-top"><div class="kpi-icon" style="background:var(--green-wash);color:var(--green);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div><div class="kpi-label">Present Today</div></div><div class="kpi-value" id="kpiPresent">—</div><div class="kpi-sub" id="kpiPresentSub">&nbsp;</div></div>
+          <div class="kpi-card"><div class="kpi-top"><div class="kpi-icon" style="background:var(--amber-wash);color:var(--amber);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><div class="kpi-label">Late</div></div><div class="kpi-value" id="kpiLate">—</div><div class="kpi-sub" id="kpiLateSub">&nbsp;</div></div>
+          <div class="kpi-card"><div class="kpi-top"><div class="kpi-icon" style="background:var(--red-wash);color:var(--red);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg></div><div class="kpi-label">Absent</div></div><div class="kpi-value" id="kpiAbsent">—</div><div class="kpi-sub" id="kpiAbsentSub">&nbsp;</div></div>
         </div>
-
         <div class="grid-2">
-          <div class="panel">
-            <div class="panel-head"><h3>Attendance Overview — Last 6 Days</h3></div>
-            <div class="panel-body"><canvas id="attendanceChart" height="150"></canvas></div>
-          </div>
-          <div class="panel">
-            <div class="panel-head"><h3>Attendance by Site — Today</h3></div>
-            <div class="panel-body" style="display:flex;gap:14px;align-items:center;">
-              <canvas id="siteDonut" width="120" height="120" style="flex-shrink:0;"></canvas>
-              <div style="flex:1;" id="siteDonutLegend"></div>
-            </div>
-          </div>
+          <div class="panel"><div class="panel-head"><h3>Attendance Overview — Last 6 Days</h3></div><div class="panel-body"><canvas id="attendanceChart" height="150"></canvas></div></div>
+          <div class="panel"><div class="panel-head"><h3>Attendance by Site — Today</h3></div><div class="panel-body" style="display:flex;gap:14px;align-items:center;"><canvas id="siteDonut" width="120" height="120" style="flex-shrink:0;"></canvas><div style="flex:1;" id="siteDonutLegend"></div></div></div>
         </div>
-
         <div class="grid-2">
-          <div class="panel">
-            <div class="panel-head">
-              <h3>Recent Attendance — Today</h3>
-              <span class="link-btn" onclick="showPage('team')">View all</span>
-            </div>
-            <div class="panel-body" style="padding:0 18px 8px;">
-              <table id="recentAttendanceTable">
-                <tr><th>Worker</th><th>Site</th><th>Check In</th><th>Check Out</th><th>Status</th></tr>
-              </table>
-              <div class="empty-note hidden" id="recentAttendanceEmpty">No check-ins yet today.</div>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-head">
-              <h3>Review Queue</h3>
-              <span class="link-btn" onclick="showPage('anomalies')">View all</span>
-            </div>
-            <div class="panel-body" id="reviewQueueBody">
-              <div class="empty-note">Nothing flagged. Loading…</div>
-            </div>
-          </div>
+          <div class="panel"><div class="panel-head"><h3>Recent Attendance — Today</h3><span class="link-btn" onclick="showPage('team')">View all</span></div><div class="panel-body" style="padding:0 18px 8px;"><table id="recentAttendanceTable"><tr><th>Worker</th><th>Site</th><th>Check In</th><th>Check Out</th><th>Status</th></tr></table><div class="empty-note hidden" id="recentAttendanceEmpty">No check-ins yet today.</div></div></div>
+          <div class="panel"><div class="panel-head"><h3>Review Queue</h3><span class="link-btn" onclick="showPage('anomalies')">View all</span></div><div class="panel-body" id="reviewQueueBody"><div class="empty-note">Nothing flagged. Loading…</div></div></div>
         </div>
       </div>
 
       <div class="page" id="page-team">
         <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-          <button id="openAddWorkerBtn" style="display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-            Add Worker
-          </button>
+          <button id="openAddWorkerBtn" style="display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">+ Add Worker</button>
         </div>
         <div id="teamBySite"><div class="empty-note">Loading team…</div></div>
       </div>
 
       <div class="page" id="page-activityfeed">
-        <div class="panel">
-          <div class="panel-head">
-            <h3>Activity Feed — All Workers</h3>
-            <input id="feedSearch" placeholder="Filter by worker..." style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12.5px;width:180px;outline:none;" />
-          </div>
-          <div class="panel-body" id="feedBody" style="padding-top:6px;"><div class="empty-note">Loading…</div></div>
-        </div>
+        <div class="panel"><div class="panel-head"><h3>Activity Feed — All Workers</h3><input id="feedSearch" placeholder="Filter by worker..." style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12.5px;width:180px;outline:none;" /></div><div class="panel-body" id="feedBody" style="padding-top:6px;"><div class="empty-note">Loading…</div></div></div>
       </div>
 
       <div class="page" id="page-attendance">
-        <div class="panel" style="margin-bottom:16px;">
-          <div class="panel-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
-            <div>
-              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">From</label>
-              <input type="date" id="attStart" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" />
-            </div>
-            <div>
-              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">To</label>
-              <input type="date" id="attEnd" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" />
-            </div>
-            <div>
-              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Site</label>
-              <select id="attSiteFilter" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;background:#fff;min-width:150px;"><option value="">All sites</option></select>
-            </div>
-            <div style="flex:1;min-width:160px;">
-              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Worker</label>
-              <input type="text" id="attSearch" placeholder="Search by name…" style="width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;" />
-            </div>
-            <div>
-              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label>
-              <button id="attFlaggedOnly" style="border:1px solid var(--line-strong);background:#fff;border-radius:8px;padding:9px 13px;font-size:12.5px;font-weight:600;color:var(--ink-dim);cursor:pointer;">Flagged only</button>
-            </div>
-            <div>
-              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label>
-              <button id="attExportBtn" style="border:none;background:var(--blue);color:#fff;border-radius:8px;padding:9px 15px;font-size:12.5px;font-weight:700;cursor:pointer;">Download CSV</button>
-            </div>
-          </div>
-        </div>
-        <div class="panel">
-          <div class="panel-head"><h3>Check-in / Check-out Log</h3><span id="attCount" style="font-size:11.5px;color:var(--ink-faint);font-weight:600;"></span></div>
-          <div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;">
-            <table>
-              <thead><tr><th>Worker</th><th>Site</th><th>Type</th><th>Time</th><th>Distance</th><th>Status</th></tr></thead>
-              <tbody id="attTableBody"></tbody>
-            </table>
-            <div id="attEmpty" class="empty-note hidden">No check-ins match these filters.</div>
-          </div>
-        </div>
+        <div class="panel" style="margin-bottom:16px;"><div class="panel-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+          <div><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">From</label><input type="date" id="attStart" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" /></div>
+          <div><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">To</label><input type="date" id="attEnd" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" /></div>
+          <div><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Site</label><select id="attSiteFilter" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;background:#fff;min-width:150px;"><option value="">All sites</option></select></div>
+          <div style="flex:1;min-width:160px;"><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Worker</label><input type="text" id="attSearch" placeholder="Search by name…" style="width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;" /></div>
+          <div><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label><button id="attFlaggedOnly" style="border:1px solid var(--line-strong);background:#fff;border-radius:8px;padding:9px 13px;font-size:12.5px;font-weight:600;color:var(--ink-dim);cursor:pointer;">Flagged only</button></div>
+          <div><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label><button id="attExportBtn" style="border:none;background:var(--blue);color:#fff;border-radius:8px;padding:9px 15px;font-size:12.5px;font-weight:700;cursor:pointer;">Download CSV</button></div>
+        </div></div>
+        <div class="panel"><div class="panel-head"><h3>Check-in / Check-out Log</h3><span id="attCount" style="font-size:11.5px;color:var(--ink-faint);font-weight:600;"></span></div><div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;"><table><thead><tr><th>Worker</th><th>Site</th><th>Type</th><th>Time</th><th>Distance</th><th>Status</th></tr></thead><tbody id="attTableBody"></tbody></table><div id="attEmpty" class="empty-note hidden">No check-ins match these filters.</div></div></div>
       </div>
 
-      <!-- SITES (full management) -->
-      <div class="page" id="page-sites">
-        <div id="sitesPageBody"><div class="empty-note">Loading sites…</div></div>
-      </div>
-
-      <div class="page" id="page-leave"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Days-off / leave requests aren't tracked yet — this page is next on the roadmap.</div></div></div>
-
-      <!-- SKILLS (full management) -->
-      <div class="page" id="page-skills">
-        <div id="skillsPageBody"><div class="empty-note">Loading skills…</div></div>
-      </div>
-
+      <div class="page" id="page-sites"><div id="sitesPageBody"><div class="empty-note">Loading sites…</div></div></div>
+      <div class="page" id="page-leave"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Days-off / leave requests aren't tracked yet.</div></div></div>
+      <div class="page" id="page-skills"><div id="skillsPageBody"><div class="empty-note">Loading skills…</div></div></div>
       <div class="page" id="page-anomalies"><div class="panel"><div class="panel-head"><h3>Flagged Check-ins Awaiting Review</h3></div><div class="panel-body" id="anomaliesFullBody"><div class="empty-note">Loading…</div></div></div></div>
-
-      <div class="page" id="page-reports"><div class="panel"><div class="panel-body">
-        <div class="classic-note">Use Attendance → Download CSV for payroll export by date range.</div>
-      </div></div></div>
-
+      <div class="page" id="page-reports"><div class="panel"><div class="panel-body"><div class="classic-note">Use Attendance → Download CSV for payroll export.</div></div></div></div>
       <div class="page" id="page-devices">
-        <div class="panel" style="margin-bottom:16px;">
-          <div class="panel-body" style="display:flex;gap:12px;align-items:center;">
-            <input type="text" id="devSearch" placeholder="Search workers…" style="flex:1;border:1px solid var(--line-strong);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" />
-            <span id="devPendingBadge" class="nav-badge hidden" style="position:static;"></span>
-          </div>
-        </div>
-        <div class="panel">
-          <div class="panel-head"><h3>Device Bindings</h3></div>
-          <div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;">
-            <table>
-              <thead><tr><th>Worker</th><th>Status</th><th>Bound Since</th><th></th></tr></thead>
-              <tbody id="devTableBody"></tbody>
-            </table>
-            <div id="devEmpty" class="empty-note hidden">No workers match this search.</div>
-          </div>
-        </div>
+        <div class="panel" style="margin-bottom:16px;"><div class="panel-body" style="display:flex;gap:12px;align-items:center;"><input type="text" id="devSearch" placeholder="Search workers…" style="flex:1;border:1px solid var(--line-strong);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" /><span id="devPendingBadge" class="nav-badge hidden" style="position:static;"></span></div></div>
+        <div class="panel"><div class="panel-head"><h3>Device Bindings</h3></div><div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;"><table><thead><tr><th>Worker</th><th>Status</th><th>Bound Since</th><th></th></tr></thead><tbody id="devTableBody"></tbody></table><div id="devEmpty" class="empty-note hidden">No workers match this search.</div></div></div>
       </div>
-      <div class="page" id="page-settings"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Geofence radius, work hours, and account settings — coming to this dashboard next.</div></div></div>
-
+      <div class="page" id="page-settings"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Settings coming next.</div></div></div>
     </div>
   </div>
 </div>
 
-<!-- Site modal -->
 <div class="drawer-overlay" id="siteModalOverlay">
   <div class="drawer" style="max-width:420px;">
-    <div class="drawer-head">
-      <div class="drawer-close" id="siteModalClose">✕</div>
-      <div id="siteModalTitle" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;color:var(--ink);">Add Site</div>
-    </div>
+    <div class="drawer-head"><div class="drawer-close" id="siteModalClose">✕</div><div id="siteModalTitle" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;">Add Site</div></div>
     <div class="drawer-body" style="padding:20px;">
       <form id="siteModalForm">
         <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Name</label>
@@ -324,14 +190,8 @@
         <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Address (optional)</label>
         <input id="siteAddress" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" />
         <div style="display:flex;gap:10px;">
-          <div style="flex:1;">
-            <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Latitude</label>
-            <input id="siteLat" required type="number" step="any" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" />
-          </div>
-          <div style="flex:1;">
-            <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Longitude</label>
-            <input id="siteLng" required type="number" step="any" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" />
-          </div>
+          <div style="flex:1;"><label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Latitude</label><input id="siteLat" required type="number" step="any" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" /></div>
+          <div style="flex:1;"><label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Longitude</label><input id="siteLng" required type="number" step="any" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" /></div>
         </div>
         <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Geofence radius (meters)</label>
         <input id="siteRadius" type="number" min="1" max="5000" value="200" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" />
@@ -344,26 +204,19 @@
 
 <div class="drawer-overlay" id="addWorkerOverlay">
   <div class="drawer" style="max-width:420px;">
-    <div class="drawer-head">
-      <div class="drawer-close" id="addWorkerCloseBtn">✕</div>
-      <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;color:var(--ink);">Add Worker</div>
-    </div>
+    <div class="drawer-head"><div class="drawer-close" id="addWorkerCloseBtn">✕</div><div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;">Add Worker</div></div>
     <div class="drawer-body" style="padding:20px;">
       <form id="addWorkerForm">
         <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Full name</label>
-        <input id="awFullName" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" placeholder="e.g. Ahmed Fathy" />
+        <input id="awFullName" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" />
         <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Username</label>
-        <input id="awUsername" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;font-family:'JetBrains Mono',monospace;" placeholder="e.g. ahmed.f" />
+        <input id="awUsername" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;font-family:'JetBrains Mono',monospace;" />
         <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Temporary password</label>
-        <input id="awPassword" required type="text" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:4px;outline:none;font-family:'JetBrains Mono',monospace;" placeholder="min. 8 characters" />
-        <div style="font-size:11px;color:var(--ink-faint);margin-bottom:14px;">At least 8 characters.</div>
+        <input id="awPassword" required type="text" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;font-family:'JetBrains Mono',monospace;" />
         <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Phone (optional)</label>
         <input id="awPhone" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" />
         <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Role</label>
-        <select id="awRole" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:18px;outline:none;background:#fff;">
-          <option value="employee" selected>Employee</option>
-          <option value="admin">Admin</option>
-        </select>
+        <select id="awRole" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:18px;outline:none;background:#fff;"><option value="employee" selected>Employee</option><option value="admin">Admin</option></select>
         <div id="addWorkerError" class="hidden" style="background:var(--red-wash);color:var(--red);border-radius:var(--radius-sm);padding:10px 12px;font-size:12.5px;margin-bottom:14px;"></div>
         <button type="submit" id="addWorkerSubmitBtn" style="width:100%;padding:12px 0;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Add Worker</button>
       </form>
@@ -375,40 +228,12 @@
   <div class="drawer">
     <div class="drawer-head">
       <div class="drawer-close" id="drawerCloseBtn">✕</div>
-      <div class="drawer-profile">
-        <div class="avatar-lg" id="dwAvatar">—</div>
-        <div>
-          <div class="drawer-name" id="dwName">—</div>
-          <div class="drawer-role" id="dwRole"></div>
-        </div>
-      </div>
-      <div class="drawer-stats">
-        <div><div class="dstat-val" id="dwAttendance">—</div><div class="dstat-label">Attendance</div></div>
-        <div><div class="dstat-val" id="dwDaysOff">—</div><div class="dstat-label">Days Off</div></div>
-        <div><div class="dstat-val" id="dwSites">—</div><div class="dstat-label">Sites</div></div>
-      </div>
+      <div class="drawer-profile"><div class="avatar-lg" id="dwAvatar">—</div><div><div class="drawer-name" id="dwName">—</div><div class="drawer-role" id="dwRole"></div></div></div>
+      <div class="drawer-stats"><div><div class="dstat-val" id="dwAttendance">—</div><div class="dstat-label">Attendance</div></div><div><div class="dstat-val" id="dwDaysOff">—</div><div class="dstat-label">Days Off</div></div><div><div class="dstat-val" id="dwSites">—</div><div class="dstat-label">Sites</div></div></div>
     </div>
-    <div class="tabs">
-      <div class="tab active" data-tab="overview">Overview</div>
-      <div class="tab" data-tab="daysoff">Days Off</div>
-      <div class="tab" data-tab="sitelog">Site Log</div>
-      <div class="tab" data-tab="activity">Activity Log</div>
-      <div class="tab" data-tab="monthly">Monthly Report</div>
-    </div>
+    <div class="tabs"><div class="tab active" data-tab="overview">Overview</div><div class="tab" data-tab="daysoff">Days Off</div><div class="tab" data-tab="sitelog">Site Log</div><div class="tab" data-tab="activity">Activity Log</div><div class="tab" data-tab="monthly">Monthly Report</div></div>
     <div class="drawer-body">
-      <div class="tab-panel active" id="tab-overview">
-        <div class="panel" style="margin-bottom:14px;">
-          <div class="panel-head"><h3>Skills</h3></div>
-          <div class="panel-body" id="dwSkills"></div>
-        </div>
-        <div class="panel">
-          <div class="panel-head"><h3>Contact</h3></div>
-          <div class="panel-body" style="font-size:13px;line-height:2;">
-            <div>Phone: <span class="mono" id="dwPhone">—</span></div>
-            <div>Username: <span class="mono" id="dwUsername">—</span></div>
-          </div>
-        </div>
-      </div>
+      <div class="tab-panel active" id="tab-overview"><div class="panel" style="margin-bottom:14px;"><div class="panel-head"><h3>Skills</h3></div><div class="panel-body" id="dwSkills"></div></div><div class="panel"><div class="panel-head"><h3>Contact</h3></div><div class="panel-body" style="font-size:13px;line-height:2;"><div>Phone: <span class="mono" id="dwPhone">—</span></div><div>Username: <span class="mono" id="dwUsername">—</span></div></div></div></div>
       <div class="tab-panel" id="tab-daysoff"><div class="empty-note">Days-off tracking isn't built yet.</div></div>
       <div class="tab-panel" id="tab-sitelog"></div>
       <div class="tab-panel" id="tab-activity"></div>
@@ -418,12 +243,7 @@
 </div>
 
 <div id="toast" class="toast hidden"></div>
-<style>
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:100;box-shadow:var(--shadow-lg);}
-.toast-error{background:var(--red);}
-.toast-success{background:var(--green);}
-.hidden{display:none !important;}
-</style>
+<style>.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:100;}.toast-error{background:var(--red);}.toast-success{background:var(--green);}.hidden{display:none !important;}</style>
 
 <script>
   window.HTN_API_BASE_URL =
@@ -434,6 +254,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
 <script src="js/api.js"></script>
 <script src="js/i18n.js"></script>
+<script src="js/notify.js"></script>
 <script src="js/admin-dashboard.js"></script>
 <script src="js/admin-dashboard-ops.js"></script>
 </body>
