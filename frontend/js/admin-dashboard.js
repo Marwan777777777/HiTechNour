@@ -2,7 +2,17 @@
 // This page is only for admins. A worker landing here (bad link, stale
 // bookmark) gets bounced straight back to the regular app instead of
 // seeing a broken dashboard.
-(async function guard() {
+//
+// Important: a slept/cold-starting backend (Railway free tier, a sleeping
+// Neon DB) can make Api.me() fail or time out for reasons that have
+// nothing to do with who's logged in. Treating every failure as "not an
+// admin" causes a redirect ping-pong with index.html's own retry logic
+// (index.html retries, succeeds, sends us back here; we hit another
+// transient hiccup, bounce again). Only a genuine 401 - which apiRequest
+// already reacts to by clearing the stored token - should count as
+// "not authorized." Anything else gets retried instead.
+(async function guard(attempt = 1) {
+  const maxAttempts = 4;
   const token = Auth.getToken();
   if (!token) {
     window.location.href = "index.html";
@@ -19,7 +29,20 @@
     document.getElementById("footerAvatar").textContent = initials(me.fullName || me.username);
     boot();
   } catch (err) {
-    window.location.href = "index.html";
+    // apiRequest's 401 branch already clears the token on a real auth
+    // failure - if it's gone, this genuinely isn't a logged-in admin.
+    if (!Auth.getToken()) {
+      window.location.href = "index.html";
+      return;
+    }
+    if (attempt >= maxAttempts) {
+      // Give up gracefully instead of looping forever - send them back to
+      // index.html once, which has its own reconnect banner for a truly
+      // unreachable server, rather than flashing between pages.
+      window.location.href = "index.html";
+      return;
+    }
+    setTimeout(() => guard(attempt + 1), attempt * 1500);
   }
 })();
 
