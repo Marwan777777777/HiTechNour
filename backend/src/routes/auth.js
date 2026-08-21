@@ -20,8 +20,6 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     );
     const user = rows[0];
 
-    // Same generic error whether the username doesn't exist or the password
-    // is wrong - never leak which one it was.
     if (!user || !user.active) {
       return res.status(401).json({ error: "Incorrect username or password." });
     }
@@ -31,16 +29,19 @@ router.post("/login", loginLimiter, async (req, res, next) => {
       return res.status(401).json({ error: "Incorrect username or password." });
     }
 
-    // Long-lived on purpose - workers shouldn't have to re-login daily.
-    // Real revocation happens two ways: requireAuth re-checks `active` on
-    // every request (disable = instant cutoff), and tokenVersion below lets
-    // an admin force a specific device to log out without disabling the
-    // account (e.g. lost phone) via POST /users/:id/force-logout.
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, tokenVersion: user.token_version },
       process.env.JWT_SECRET,
       { expiresIn: "365d" }
     );
+
+    // Authentication must never depend on the audit log succeeding.
+    try {
+      await pool.query(
+        "INSERT INTO activity_logs (user_id, kind, detail) VALUES ($1, $2, $3)",
+        [user.id, "login", "Successful sign-in"]
+      );
+    } catch (_) {}
 
     res.json({
       token,
@@ -51,12 +52,10 @@ router.post("/login", loginLimiter, async (req, res, next) => {
   }
 });
 
-// Lets the frontend confirm a stored token is still good on app open,
-// without waiting for a check-in attempt to find out it's dead.
 router.get("/me", requireAuth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      "SELECT id, username, full_name, role, phone, device_id, pending_device_id FROM users WHERE id = $1",
+      "SELECT id, username, full_name, role, phone, device_id, pending_device_id, locale FROM users WHERE id = $1",
       [req.user.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "User not found." });
@@ -67,6 +66,7 @@ router.get("/me", requireAuth, async (req, res, next) => {
       fullName: u.full_name,
       role: u.role,
       phone: u.phone,
+      locale: u.locale || "en",
       deviceApproved: !!u.device_id,
       devicePending: !!u.pending_device_id && !u.device_id,
     });
