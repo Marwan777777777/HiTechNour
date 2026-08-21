@@ -11,13 +11,60 @@ const router = express.Router();
 router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, username, full_name, phone, role, title, active,
+      `SELECT id, username, full_name, phone, role, title, active, locale,
               device_id IS NOT NULL AS device_approved,
               pending_device_id IS NOT NULL AND device_id IS NULL AS device_pending,
               device_bound_at, created_at
        FROM users ORDER BY full_name`
     );
     res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Worker: update own profile (full name, phone, locale)
+router.patch("/me", requireAuth, async (req, res, next) => {
+  try {
+    const { fullName, phone, locale } = req.body;
+    const finalLocale = locale === "ar" || locale === "en" ? locale : undefined;
+
+    const { rows } = await pool.query(
+      `UPDATE users SET
+         full_name = COALESCE($1, full_name),
+         phone = COALESCE($2, phone),
+         locale = COALESCE($3, locale)
+       WHERE id = $4
+       RETURNING id, username, full_name, phone, role, locale, active`,
+      [
+        fullName ? fullName.trim() : null,
+        phone !== undefined ? phone : null,
+        finalLocale || null,
+        req.user.id,
+      ]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "User not found." });
+    res.json(rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Worker: delete own account (hard delete – irreversible)
+router.delete("/me", requireAuth, async (req, res, next) => {
+  try {
+    // Prevent the last admin from deleting themselves
+    if (req.user.role === "admin") {
+      const { rows } = await pool.query(
+        `SELECT COUNT(*)::int AS c FROM users WHERE role = 'admin' AND active = true`
+      );
+      if (rows[0].c <= 1) {
+        return res.status(400).json({ error: "Cannot delete the last admin account." });
+      }
+    }
+
+    await pool.query(`DELETE FROM users WHERE id = $1`, [req.user.id]);
+    res.json({ ok: true, message: "Account deleted." });
   } catch (err) {
     next(err);
   }
@@ -169,6 +216,14 @@ router.post("/:id/approve-device", requireAuth, requireAdmin, async (req, res, n
     if (!rows[0]) {
       return res.status(400).json({ error: "No pending device to approve for this user." });
     }
+
+    // Notify the worker that their device is approved
+    await pool.query(
+      `INSERT INTO notifications (user_id, title, body, kind)
+       VALUES ($1, $2, $3, $4)`,
+      [req.params.id, "Device approved", "You can now check in from this phone.", "device"]
+    );
+
     res.json(rows[0]);
   } catch (err) {
     next(err);
