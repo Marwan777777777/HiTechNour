@@ -7,6 +7,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/admin-dashboard.css" />
+<style>
+.lang-toggle{
+  background:var(--panel,#fff);border:1px solid var(--line-strong,#D8DEEB);color:var(--ink,#0F1A33);
+  border-radius:9px;min-width:36px;height:34px;padding:0 10px;font-family:'Space Grotesk',sans-serif;
+  font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+}
+.lang-toggle:hover{border-color:var(--blue,#2557D6);color:var(--blue,#2557D6);}
+</style>
 </head>
 <body>
 
@@ -106,7 +114,8 @@
           <span id="topbarDate"></span>
         </div>
       </div>
-      <div class="topbar-right">
+      <div class="topbar-right" style="display:flex;align-items:center;gap:10px;">
+        <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
         <div class="icon-btn" id="refreshBtn" title="Refresh">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </div>
@@ -221,7 +230,7 @@
         </div>
       </div>
 
-      <!-- ============ PLACEHOLDER PAGES (not built yet) ============ -->
+      <!-- ============ PLACEHOLDER PAGES ============ -->
       <div class="page" id="page-attendance">
         <div class="panel" style="margin-bottom:16px;">
           <div class="panel-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
@@ -263,12 +272,12 @@
         </div>
       </div>
       <div class="page" id="page-sites"><div class="panel"><div class="panel-body">
-        <div class="classic-note">Site management &amp; skill requirements are on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
+        <div class="classic-note">Site management is on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
         <div style="padding:30px;text-align:center;color:var(--ink-faint);">Site directory with map pins — coming to this dashboard next.</div>
       </div></div></div>
       <div class="page" id="page-leave"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Days-off / leave requests aren't tracked yet — this page is next on the roadmap.</div></div></div>
       <div class="page" id="page-skills"><div class="panel"><div class="panel-body">
-        <div class="classic-note">Skill tags &amp; worker tagging are on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
+        <div class="classic-note">Skill tags are on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
       </div></div></div>
       <div class="page" id="page-anomalies"><div class="panel"><div class="panel-head"><h3>Flagged Check-ins Awaiting Review</h3></div><div class="panel-body" id="anomaliesFullBody"><div class="empty-note">Loading…</div></div></div></div>
       <div class="page" id="page-reports"><div class="panel"><div class="panel-body">
@@ -390,10 +399,6 @@
 </style>
 
 <script>
-  // Auto-switch: localhost during local dev, Railway URL in production.
-  // Must match index.html's config exactly - without this, api.js silently
-  // falls back to http://localhost:4000/api, which gets blocked as mixed
-  // content on this https page and every API call fails with no status code.
   window.HTN_API_BASE_URL =
     (location.hostname === "localhost" || location.hostname === "127.0.0.1")
       ? "http://localhost:4000/api"
@@ -401,6 +406,7 @@
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
 <script src="js/api.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/admin-dashboard.js"></script>
 </body>
 </html>

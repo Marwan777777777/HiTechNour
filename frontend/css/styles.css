@@ -1,7 +1,5 @@
 /* ==========================================================================
    HighTechNour Attendance — worker/login surface.
-   Tokens intentionally match frontend/css/admin-dashboard.css exactly so
-   the whole app (worker + admin) reads as one product, not two.
    ========================================================================== */
 :root {
   --bg:#F6F8FC;
@@ -70,7 +68,7 @@ button,input,select,textarea{font-family:inherit;}
 }
 .topbar-title{font-family:'Space Grotesk';font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;}
 .topbar-title::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;}
-.topbar-user{display:flex;align-items:center;gap:12px;color:var(--ink-dim);font-size:13px;font-weight:500;}
+.topbar-user{display:flex;align-items:center;gap:10px;color:var(--ink-dim);font-size:13px;font-weight:500;}
 .icon-button{
   background:var(--panel);border:1px solid var(--line);color:var(--ink-dim);border-radius:var(--radius-sm);
   width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;
@@ -78,6 +76,17 @@ button,input,select,textarea{font-family:inherit;}
 }
 .icon-button:hover{border-color:var(--red);color:var(--red);}
 .main-content{padding:20px 18px 32px;flex:1;max-width:480px;margin:0 auto;width:100%;}
+
+/* ---------- Language toggle ---------- */
+.lang-toggle{
+  background:var(--panel);border:1px solid var(--line-strong);color:var(--ink);
+  border-radius:var(--radius-sm);min-width:36px;height:34px;padding:0 10px;
+  font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:border-color .12s,color .12s;
+}
+.lang-toggle:hover{border-color:var(--blue);color:var(--blue);}
+.lang-row{display:flex;justify-content:flex-end;margin-bottom:8px;}
 
 /* ---------- Login ---------- */
 #login-screen{align-items:center;justify-content:center;padding:20px;}
