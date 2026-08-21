@@ -1,7 +1,7 @@
 // Simple EN / AR dictionary + direction switching + live UI apply
 const I18N = {
   en: {
-    appName: "HighTechNour",
+    appName: "HiTechNour",
     siteAttendance: "Site Attendance",
     username: "Username",
     password: "Password",
@@ -143,13 +143,11 @@ function syncLangToggles() {
   });
 }
 
-/** Apply t() to every element with data-i18n / data-i18n-placeholder / data-i18n-title */
 function applyTranslations() {
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     const key = el.getAttribute("data-i18n");
     if (!key) return;
     const text = t(key);
-    // Prefer updating .btn-label if present (loading spinner pattern)
     const label = el.querySelector(".btn-label");
     if (label) label.textContent = text;
     else el.textContent = text;
@@ -162,8 +160,6 @@ function applyTranslations() {
     const key = el.getAttribute("data-i18n-title");
     if (key) el.setAttribute("title", t(key));
   });
-
-  // Dynamic bits that live in JS state
   try {
     if (typeof state !== "undefined" && state.isCheckedIn !== undefined) {
       const btn = document.getElementById("checkin-button");
