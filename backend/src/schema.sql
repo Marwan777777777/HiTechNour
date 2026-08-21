@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   device_bound_at    TIMESTAMPTZ,
   active             BOOLEAN NOT NULL DEFAULT true,
   token_version      INTEGER NOT NULL DEFAULT 0,
+  locale             TEXT NOT NULL DEFAULT 'en' CHECK (locale IN ('en', 'ar')),
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -97,3 +98,72 @@ CREATE TABLE IF NOT EXISTS site_skill_requirements (
   workers_needed  INTEGER NOT NULL DEFAULT 1 CHECK (workers_needed >= 1),
   PRIMARY KEY (site_id, skill_id)
 );
+
+-- Field reports submitted by workers ("what happened on site").
+CREATE TABLE IF NOT EXISTS reports (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  site_id     INTEGER REFERENCES sites(id),
+  title       TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted', 'reviewed')),
+  reviewed_by INTEGER REFERENCES users(id),
+  reviewed_at TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_user ON reports (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status, created_at DESC);
+
+-- Admin-created surveys (e.g. daily safety check).
+CREATE TABLE IF NOT EXISTS surveys (
+  id          SERIAL PRIMARY KEY,
+  title       TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  active      BOOLEAN NOT NULL DEFAULT true,
+  created_by  INTEGER REFERENCES users(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS survey_answers (
+  id          SERIAL PRIMARY KEY,
+  survey_id   INTEGER NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  answer      TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (survey_id, user_id)
+);
+
+-- Company-wide announcements.
+CREATE TABLE IF NOT EXISTS announcements (
+  id          SERIAL PRIMARY KEY,
+  title       TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  created_by  INTEGER REFERENCES users(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Per-user in-app notifications.
+CREATE TABLE IF NOT EXISTS notifications (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  kind        TEXT NOT NULL DEFAULT 'info',
+  read        BOOLEAN NOT NULL DEFAULT false,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, created_at DESC);
+
+-- Lightweight audit / activity log (app open, check-in, device approve, etc.).
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL,
+  kind        TEXT NOT NULL,
+  detail      TEXT NOT NULL DEFAULT '',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON activity_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_user ON activity_logs (user_id, created_at DESC);
