@@ -3,7 +3,7 @@ const bcrypt = require("bcrypt");
 const pool = require("../db");
 const { requireAuth, requireAdmin } = require("../middleware/auth");
 const { isNonEmptyString } = require("../utils/validate");
-const { getMonthlyAttendance, resolveMonth } = require("../utils/attendance");
+const { getMonthlyAttendance, resolveMonth, getDailyHours } = require("../utils/attendance");
 
 const router = express.Router();
 
@@ -11,7 +11,7 @@ const router = express.Router();
 router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, username, full_name, phone, role, active,
+      `SELECT id, username, full_name, phone, role, title, active,
               device_id IS NOT NULL AS device_approved,
               pending_device_id IS NOT NULL AND device_id IS NULL AS device_pending,
               device_bound_at, created_at
@@ -30,7 +30,7 @@ router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
 router.get("/:id/summary", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const userResult = await pool.query(
-      "SELECT id, username, full_name, phone, role, active, created_at FROM users WHERE id = $1",
+      "SELECT id, username, full_name, phone, role, title, active, created_at FROM users WHERE id = $1",
       [req.params.id]
     );
     const user = userResult.rows[0];
@@ -79,6 +79,7 @@ router.get("/:id/summary", requireAuth, requireAdmin, async (req, res, next) => 
         fullName: user.full_name,
         phone: user.phone,
         role: user.role,
+        title: user.title,
         active: user.active,
       },
       attendance,
@@ -86,6 +87,17 @@ router.get("/:id/summary", requireAuth, requireAdmin, async (req, res, next) => 
       teammates: teamResult.rows,
       skills: skillsResult.rows,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Admin: per-day hours worked this month - powers the worker drawer's
+// Monthly Report chart.
+router.get("/:id/daily", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const breakdown = await getDailyHours(req.params.id, req.query.month);
+    res.json(breakdown);
   } catch (err) {
     next(err);
   }
@@ -124,16 +136,17 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
 // Admin: update a worker's basic info / active status.
 router.patch("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const { fullName, phone, active, role } = req.body;
+    const { fullName, phone, active, role, title } = req.body;
     const { rows } = await pool.query(
       `UPDATE users SET
          full_name = COALESCE($1, full_name),
          phone = COALESCE($2, phone),
          active = COALESCE($3, active),
-         role = COALESCE($4, role)
-       WHERE id = $5
-       RETURNING id, username, full_name, phone, role, active`,
-      [fullName || null, phone || null, active === undefined ? null : !!active, role || null, req.params.id]
+         role = COALESCE($4, role),
+         title = COALESCE($5, title)
+       WHERE id = $6
+       RETURNING id, username, full_name, phone, role, title, active`,
+      [fullName || null, phone || null, active === undefined ? null : !!active, role || null, title === undefined ? null : title, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "User not found." });
     res.json(rows[0]);
