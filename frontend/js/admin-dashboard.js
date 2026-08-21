@@ -191,9 +191,116 @@ function showPage(name) {
   document.getElementById("pageTitle").textContent = pageTitles[name] || name;
 
   if (name === "team" && !state.team) loadTeam();
+  if (name === "attendance" && !state.attendance) loadAttendanceLog();
   if (name === "activityfeed" && !state.feed) loadActivityFeed();
   if (name === "anomalies") loadAnomaliesFull();
 }
+
+// ---- Attendance (full log) ----
+async function loadAttendanceLog() {
+  const tbody = document.getElementById("attTableBody");
+  try {
+    const [checkins, sites] = await Promise.all([Api.getAllCheckins(), Api.getSites()]);
+    state.attendance = checkins;
+
+    const siteFilter = document.getElementById("attSiteFilter");
+    siteFilter.innerHTML =
+      '<option value="">All sites</option>' +
+      sites.map((s) => `<option value="${s.name}">${s.name}</option>`).join("");
+
+    renderAttendanceLog();
+  } catch (err) {
+    tbody.innerHTML = "";
+    document.getElementById("attEmpty").textContent = err.message;
+    document.getElementById("attEmpty").classList.remove("hidden");
+  }
+}
+
+function renderAttendanceLog() {
+  if (!state.attendance) return;
+  const start = document.getElementById("attStart").value;
+  const end = document.getElementById("attEnd").value;
+  const site = document.getElementById("attSiteFilter").value;
+  const search = (document.getElementById("attSearch").value || "").toLowerCase();
+  const flaggedOnly = document.getElementById("attFlaggedOnly").classList.contains("is-active");
+
+  let rows = state.attendance;
+  if (start) rows = rows.filter((r) => r.created_at.slice(0, 10) >= start);
+  if (end) rows = rows.filter((r) => r.created_at.slice(0, 10) <= end);
+  if (site) rows = rows.filter((r) => r.site_name === site);
+  if (search) rows = rows.filter((r) => r.full_name.toLowerCase().includes(search));
+  if (flaggedOnly) rows = rows.filter((r) => r.flagged);
+
+  const tbody = document.getElementById("attTableBody");
+  const empty = document.getElementById("attEmpty");
+  document.getElementById("attCount").textContent = `${rows.length} of ${state.attendance.length}${state.attendance.length >= 500 ? "+ (showing most recent 500)" : ""}`;
+
+  if (!rows.length) {
+    tbody.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+
+  tbody.innerHTML = rows
+    .map((r) => {
+      const statusLabel = r.flagged && !r.reviewed ? "flagged" : r.status;
+      const statusClass = r.flagged && !r.reviewed ? "status-late" : r.status === "inside" ? "status-inside" : "status-outside";
+      return `
+      <tr class="row-click" data-worker-id="${r.user_id || ""}">
+        <td class="name-cell"><div class="avatar-sm">${initials(r.full_name)}</div>${r.full_name}</td>
+        <td>${r.site_name}</td>
+        <td class="mono">${r.type === "check_in" ? "IN" : "OUT"}</td>
+        <td class="mono">${new Date(r.created_at).toLocaleString()}</td>
+        <td class="mono">${r.distance_meters != null ? Math.round(r.distance_meters) + "m" : "—"}</td>
+        <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
+      </tr>`;
+    })
+    .join("");
+
+  tbody.querySelectorAll("[data-worker-id]").forEach((tr) => {
+    if (tr.dataset.workerId) tr.addEventListener("click", () => openWorkerDrawer(tr.dataset.workerId));
+  });
+}
+
+["attStart", "attEnd", "attSiteFilter", "attSearch"].forEach((id) => {
+  document.getElementById(id).addEventListener("input", renderAttendanceLog);
+});
+
+document.getElementById("attFlaggedOnly").addEventListener("click", (e) => {
+  e.target.classList.toggle("is-active");
+  e.target.style.background = e.target.classList.contains("is-active") ? "var(--red-wash)" : "#fff";
+  e.target.style.color = e.target.classList.contains("is-active") ? "var(--red)" : "var(--ink-dim)";
+  e.target.style.borderColor = e.target.classList.contains("is-active") ? "var(--red)" : "var(--line-strong)";
+  renderAttendanceLog();
+});
+
+document.getElementById("attExportBtn").addEventListener("click", async () => {
+  const start = document.getElementById("attStart").value;
+  const end = document.getElementById("attEnd").value;
+  if (!start || !end) {
+    showToast("Pick a From and To date first.", "error");
+    return;
+  }
+  const btn = document.getElementById("attExportBtn");
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Preparing…";
+  try {
+    const blob = await Api.exportCsv(start, end);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "HTN_Attendance_Report.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+});
 
 // ---- Overview ----
 async function loadOverview() {
