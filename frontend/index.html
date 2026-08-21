@@ -4,27 +4,22 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>HiTechNour Attendance</title>
-
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0B1220" />
 <link rel="icon" type="image/svg+xml" href="icons/logo.svg" />
 <link rel="icon" type="image/png" href="icons/icon-192.png" />
-
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="HiTechNour" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
-
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-
 <link rel="stylesheet" href="css/styles.css" />
 <link rel="stylesheet" href="css/brand.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
-
 <div id="boot-screen" class="boot-screen">
   <img class="boot-logo-img" src="icons/logo.svg" alt="HiTechNour" onerror="this.src='icons/logo-htn.png'" />
   <div class="boot-logo-text">HiTechNour</div>
@@ -33,28 +28,21 @@
 
 <div id="login-screen" class="screen hidden">
   <div class="login-card">
-    <div class="lang-row">
-      <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
-    </div>
+    <div class="lang-row"><button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button></div>
     <div class="brand">
       <img class="brand-logo-img" src="icons/logo.svg" alt="HiTechNour" onerror="this.src='icons/logo-htn.png'" />
       <h1 data-i18n="appName">HiTechNour</h1>
       <p class="brand-sub" data-i18n="siteAttendance">Site Attendance</p>
     </div>
     <form id="login-form">
-      <label><span data-i18n="username">Username</span>
-        <input type="text" id="login-username" autocomplete="username" required />
-      </label>
+      <label><span data-i18n="username">Username</span><input type="text" id="login-username" autocomplete="username" required /></label>
       <label><span data-i18n="password">Password</span>
         <div class="password-wrap">
           <input type="password" id="login-password" autocomplete="current-password" required />
           <button type="button" id="toggle-password" class="icon-button" title="Show password">👁</button>
         </div>
       </label>
-      <button type="submit" id="login-button" class="primary-button">
-        <span class="btn-label" data-i18n="signIn">Sign In</span>
-        <span class="btn-spinner hidden" aria-hidden="true"></span>
-      </button>
+      <button type="submit" id="login-button" class="primary-button"><span class="btn-label" data-i18n="signIn">Sign In</span><span class="btn-spinner hidden" aria-hidden="true"></span></button>
       <p id="login-error" class="error-text hidden"></p>
     </form>
   </div>
@@ -62,10 +50,7 @@
 
 <div id="app-screen" class="screen hidden">
   <header class="topbar">
-    <div class="topbar-brand">
-      <img src="icons/logo.svg" alt="HiTechNour" onerror="this.src='icons/logo-htn.png'" />
-      <span>HiTechNour</span>
-    </div>
+    <div class="topbar-brand"><img src="icons/logo.svg" alt="HiTechNour" onerror="this.src='icons/logo-htn.png'" /><span>HiTechNour</span></div>
     <div class="topbar-user">
       <span id="offline-badge" class="offline-badge hidden">0 offline</span>
       <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
@@ -73,114 +58,54 @@
       <button id="logout-button" class="icon-button" data-i18n-title="logout" title="Sign out" aria-label="Sign out">⏻</button>
     </div>
   </header>
-
   <nav class="worker-tabs">
     <button class="tab-button active" data-worker-tab="home" data-i18n="home">Home</button>
     <button class="tab-button" data-worker-tab="reports" data-i18n="reports">Reports</button>
     <button class="tab-button" data-worker-tab="alerts" data-i18n="alerts">Alerts</button>
     <button class="tab-button" data-worker-tab="profile" data-i18n="profile">Profile</button>
   </nav>
-
   <main class="main-content">
     <div id="panel-home" class="worker-panel">
-      <div id="device-pending-banner" class="banner banner-warning hidden" data-i18n="pendingDevice">
-        Your device is awaiting admin approval. You can't check in until it's approved.
-      </div>
+      <div id="device-pending-banner" class="banner banner-warning hidden" data-i18n="pendingDevice">Your device is awaiting admin approval. You can't check in until it's approved.</div>
       <div id="assignment-banner" class="banner banner-assignment hidden"></div>
-      <div class="map-wrap">
-        <div id="site-map" class="site-map">
-          <div id="site-map-skeleton" class="site-map-skeleton" aria-hidden="true"></div>
-        </div>
-        <div id="status-pill" class="status-pill status-idle" data-i18n="locating">Locating…</div>
-      </div>
-      <div class="site-select-wrap">
-        <label for="site-select" data-i18n="site">Site</label>
-        <select id="site-select"></select>
-      </div>
-      <button id="checkin-button" class="primary-button" disabled>
-        <span class="btn-label" data-i18n="checkIn">Check In</span>
-        <span class="btn-spinner hidden" aria-hidden="true"></span>
-      </button>
-      <section class="attendance-summary">
-        <div class="attendance-summary-head">
-          <h2 data-i18n="myAttendance">My Attendance</h2>
-          <span id="attendance-month-label" class="meta"></span>
-        </div>
-        <div id="attendance-days" class="attendance-days">—</div>
-        <div class="attendance-bar"><div id="attendance-bar-fill" class="attendance-bar-fill"></div></div>
-      </section>
-      <section class="history">
-        <h2 data-i18n="recentActivity">Recent Activity</h2>
-        <ul id="history-list" class="history-list"></ul>
-      </section>
+      <div class="map-wrap"><div id="site-map" class="site-map"><div id="site-map-skeleton" class="site-map-skeleton" aria-hidden="true"></div></div><div id="status-pill" class="status-pill status-idle" data-i18n="locating">Locating…</div></div>
+      <div class="site-select-wrap"><label for="site-select" data-i18n="site">Site</label><select id="site-select"></select></div>
+      <button id="checkin-button" class="primary-button" disabled><span class="btn-label" data-i18n="checkIn">Check In</span><span class="btn-spinner hidden" aria-hidden="true"></span></button>
+      <section class="attendance-summary"><div class="attendance-summary-head"><h2 data-i18n="myAttendance">My Attendance</h2><span id="attendance-month-label" class="meta"></span></div><div id="attendance-days" class="attendance-days">—</div><div class="attendance-bar"><div id="attendance-bar-fill" class="attendance-bar-fill"></div></div></section>
+      <section class="history"><h2 data-i18n="recentActivity">Recent Activity</h2><ul id="history-list" class="history-list"></ul></section>
     </div>
-
     <div id="panel-reports" class="worker-panel hidden">
       <h2 data-i18n="fieldReport">Field Report</h2>
-      <label><span data-i18n="title">Title</span>
-        <input type="text" id="report-title" maxlength="120" data-i18n-placeholder="whatHappened" placeholder="What happened?" />
-      </label>
-      <label><span data-i18n="details">Details</span>
-        <textarea id="report-body" rows="4" maxlength="4000" data-i18n-placeholder="describeSituation" placeholder="Describe the situation on site…"></textarea>
-      </label>
+      <label><span data-i18n="title">Title</span><input type="text" id="report-title" maxlength="120" data-i18n-placeholder="whatHappened" placeholder="What happened?" /></label>
+      <label><span data-i18n="details">Details</span><textarea id="report-body" rows="4" maxlength="4000" data-i18n-placeholder="describeSituation" placeholder="Describe the situation on site…"></textarea></label>
       <button id="submit-report-btn" class="primary-button" data-i18n="submitReport">Submit report</button>
-      <section class="history" style="margin-top:1.5rem">
-        <h2 data-i18n="myReports">My reports</h2>
-        <ul id="reports-list" class="history-list"></ul>
-      </section>
+      <section class="history" style="margin-top:1.5rem"><h2 data-i18n="myReports">My reports</h2><ul id="reports-list" class="history-list"></ul></section>
     </div>
-
     <div id="panel-alerts" class="worker-panel hidden">
-      <div class="button-row" style="justify-content:space-between;align-items:center">
-        <h2 style="margin:0" data-i18n="alerts">Alerts</h2>
-        <button id="mark-read-btn" class="secondary-button" data-i18n="markRead">Mark all read</button>
-      </div>
+      <div class="button-row" style="justify-content:space-between;align-items:center"><h2 style="margin:0" data-i18n="alerts">Alerts</h2><button id="mark-read-btn" class="secondary-button" data-i18n="markRead">Mark all read</button></div>
       <ul id="notifications-list" class="history-list" style="margin-top:1rem"></ul>
     </div>
-
     <div id="panel-profile" class="worker-panel hidden">
       <h2 data-i18n="profile">Profile</h2>
-      <label><span data-i18n="fullName">Full name</span>
-        <input type="text" id="profile-name" />
-      </label>
-      <label><span data-i18n="phone">Phone</span>
-        <input type="text" id="profile-phone" />
-      </label>
-      <label><span data-i18n="language">Language</span>
-        <select id="profile-locale">
-          <option value="en">English</option>
-          <option value="ar">العربية</option>
-        </select>
-      </label>
+      <label><span data-i18n="fullName">Full name</span><input type="text" id="profile-name" /></label>
+      <label><span data-i18n="phone">Phone</span><input type="text" id="profile-phone" /></label>
+      <label><span data-i18n="language">Language</span><select id="profile-locale"><option value="en">English</option><option value="ar">العربية</option></select></label>
       <button id="save-profile-btn" class="primary-button" data-i18n="save">Save</button>
     </div>
   </main>
 </div>
 
-<div id="modal" class="modal hidden">
-  <div class="modal-card">
-    <h3 id="modal-title"></h3>
-    <div id="modal-body"></div>
-    <div class="modal-actions">
-      <button id="modal-cancel" class="secondary-button">Cancel</button>
-      <button id="modal-confirm" class="primary-button"><span class="btn-label">Save</span><span class="btn-spinner hidden" aria-hidden="true"></span></button>
-    </div>
-  </div>
-</div>
-
+<div id="modal" class="modal hidden"><div class="modal-card"><h3 id="modal-title"></h3><div id="modal-body"></div><div class="modal-actions"><button id="modal-cancel" class="secondary-button">Cancel</button><button id="modal-confirm" class="primary-button"><span class="btn-label">Save</span><span class="btn-spinner hidden" aria-hidden="true"></span></button></div></div></div>
 <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
-
 <script>
-  window.HTN_API_BASE_URL =
-    (location.hostname === "localhost" || location.hostname === "127.0.0.1")
-      ? "http://localhost:4000/api"
-      : "https://welcoming-blessing-production-6f01.up.railway.app/api";
+  window.HTN_API_BASE_URL = (location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "http://localhost:4000/api" : "https://welcoming-blessing-production-6f01.up.railway.app/api";
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/api.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/notify.js"></script>
 <script src="js/app.js"></script>
+<script src="js/profile-actions.js"></script>
 <script>
   document.getElementById("toggle-password")?.addEventListener("click", () => {
     const input = document.getElementById("login-password");

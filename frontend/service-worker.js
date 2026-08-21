@@ -1,4 +1,4 @@
-const CACHE_NAME = "htn-attendance-v3";
+const CACHE_NAME = "htn-attendance-v4";
 const CORE_ASSETS = [
   "/index.html",
   "/manifest.json",
@@ -8,6 +8,7 @@ const CORE_ASSETS = [
   "/js/admin.js",
   "/js/i18n.js",
   "/js/notify.js",
+  "/js/profile-actions.js",
 ];
 
 self.addEventListener("install", (event) => {
@@ -17,9 +18,7 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
   );
   self.clients.claim();
 });
@@ -28,7 +27,6 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.pathname.startsWith("/api/")) return;
   if (event.request.method !== "GET") return;
-
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -40,7 +38,7 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Push payload: { title, body, url }
+// Optional Web Push payload: { title, body, url }
 self.addEventListener("push", (event) => {
   let data = { title: "HiTechNour", body: "New update" };
   try {
@@ -58,13 +56,14 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/index.html";
+  const target = (event.notification.data && event.notification.data.url) || "/index.html";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      for (const c of list) {
-        if ("focus" in c) return c.focus();
+      const sameOrigin = list.find((client) => new URL(client.url).origin === self.location.origin);
+      if (sameOrigin) {
+        return sameOrigin.focus().then(() => sameOrigin.navigate?.(new URL(target, self.location.origin).href));
       }
-      if (clients.openWindow) return clients.openWindow(url);
+      if (clients.openWindow) return clients.openWindow(target);
     })
   );
 });
