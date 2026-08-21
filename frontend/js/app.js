@@ -1,15 +1,10 @@
 // ---- Shared helpers ----
-
-// Toast stack — supports several toasts queued at once instead of the
-// second one silently overwriting the first on flaky connections.
 function showToast(message, kind = "") {
-  const stack = document.getElementById("toast-stack");
-  if (!stack) return;
-  const toast = document.createElement("div");
-  toast.className = "toast" + (kind ? ` toast-${kind}` : "");
+  const toast = document.getElementById("toast");
   toast.textContent = message;
-  stack.appendChild(toast);
-  setTimeout(() => toast.remove(), 3200);
+  toast.className = "toast" + (kind ? ` toast-${kind}` : "");
+  toast.classList.remove("hidden");
+  setTimeout(() => toast.classList.add("hidden"), 3200);
 }
 
 function vibrate(pattern) {
@@ -19,15 +14,6 @@ function vibrate(pattern) {
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach((el) => el.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
-}
-
-// Toggle a primary-button's loading state — swaps the label for a spinner
-// and disables it, so a tap on a slow connection shows something changed
-// instead of appearing dead.
-function setButtonLoading(button, isLoading) {
-  if (!button) return;
-  button.disabled = isLoading;
-  button.classList.toggle("is-loading", isLoading);
 }
 
 // ---- App state ----
@@ -75,7 +61,8 @@ async function bootWithRetry(attempt = 1) {
     document.getElementById("boot-screen").classList.add("hidden");
     hideReconnectBanner();
     if (me.role === "admin") {
-      await enterAdmin(me);
+      window.location.href = "admin.html";
+      return;
     } else {
       await enterApp(me);
     }
@@ -123,14 +110,16 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   const button = document.getElementById("login-button");
   const errorEl = document.getElementById("login-error");
   errorEl.classList.add("hidden");
-  setButtonLoading(button, true);
+  button.disabled = true;
+  button.textContent = "Signing in…";
 
   try {
     const result = await Api.login(username, password);
     Auth.setToken(result.token);
     Auth.setUser(result.user);
     if (result.user.role === "admin") {
-      await enterAdmin(result.user);
+      window.location.href = "admin.html";
+      return;
     } else {
       await enterApp(result.user);
     }
@@ -138,7 +127,8 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
     errorEl.textContent = err.message;
     errorEl.classList.remove("hidden");
   } finally {
-    setButtonLoading(button, false);
+    button.disabled = false;
+    button.textContent = "Sign In";
   }
 });
 
@@ -176,14 +166,7 @@ async function loadAttendanceSummary() {
       : 0;
     document.getElementById("attendance-days").textContent =
       `${summary.daysPresent} / ${summary.daysInMonth} days`;
-
-    const fill = document.getElementById("attendance-bar-fill");
-    fill.style.width = `${pct}%`;
-    // Tiered color instead of always-green — a worker at 20% shouldn't
-    // read the same "all good" green as one at 95%.
-    fill.classList.remove("tier-low", "tier-mid", "tier-high");
-    fill.classList.add(pct < 50 ? "tier-low" : pct < 80 ? "tier-mid" : "tier-high");
-
+    document.getElementById("attendance-bar-fill").style.width = `${pct}%`;
     document.getElementById("attendance-month-label").textContent = summary.month;
   } catch {
     // Non-critical - if this fails, leave the placeholder text in place
@@ -197,12 +180,9 @@ async function loadAttendanceSummary() {
 function initMap() {
   if (state.map) return; // already initialized (e.g. re-entering app screen)
 
-  const skeleton = document.getElementById("site-map-skeleton");
-
   if (typeof L === "undefined") {
     const container = document.getElementById("site-map");
     if (container) container.textContent = "Map failed to load — check your connection.";
-    skeleton?.remove();
     return;
   }
 
@@ -211,7 +191,7 @@ function initMap() {
     attributionControl: true,
   }).setView([30.0561, 31.3395], 14); // Nasr City, Cairo default until we have a fix
 
-  const tileLayer = L.tileLayer(
+  L.tileLayer(
     "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
     {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
@@ -219,12 +199,6 @@ function initMap() {
       subdomains: "abcd",
     }
   ).addTo(state.map);
-
-  // Remove the shimmer skeleton once real tiles have actually painted,
-  // instead of leaving an empty dark box while they load.
-  tileLayer.once("load", () => skeleton?.remove());
-  // Safety fallback in case the 'load' event never fires (e.g. cached tiles).
-  setTimeout(() => skeleton?.remove(), 2500);
 
   const workerIcon = L.divIcon({
     className: "",
@@ -339,18 +313,14 @@ async function loadHistory() {
     list.innerHTML = "";
     result.history.forEach((item) => {
       const li = document.createElement("li");
-      const inside = item.status === "inside";
-      // is-inside/is-outside are the real source of truth for the border
-      // color — the CSS also keeps a :has(.badge-*) fallback, but that
-      // selector silently fails on older/budget Android browsers.
-      li.className = `history-item ${inside ? "is-inside" : "is-outside"}`;
+      li.className = "history-item";
       const time = new Date(item.created_at).toLocaleString();
       li.innerHTML = `
         <div>
           <div>${item.type === "check_in" ? "Checked in" : "Checked out"}</div>
           <div class="meta">${time} · ${Math.round(item.distance_meters)}m</div>
         </div>
-        <span class="badge ${inside ? "badge-inside" : "badge-outside"}">
+        <span class="badge ${item.status === "inside" ? "badge-inside" : "badge-outside"}">
           ${item.status}
         </span>
       `;
@@ -363,14 +333,13 @@ async function loadHistory() {
 
 function updateCheckinButton() {
   const button = document.getElementById("checkin-button");
-  button.querySelector(".btn-label").textContent = state.isCheckedIn ? "Check Out" : "Check In";
+  button.textContent = state.isCheckedIn ? "Check Out" : "Check In";
   button.classList.toggle("checked-in", state.isCheckedIn);
 }
 
 function startLocationWatch() {
   if (!("geolocation" in navigator)) {
-    setStatusPill("nosignal", "Location isn't available on this device.");
-    document.getElementById("checkin-button").disabled = true;
+    showToast("Location isn't available on this device/browser.", "error");
     return;
   }
   // watchPosition triggers the permission prompt once; after "Allow" the
@@ -395,26 +364,12 @@ function startLocationWatch() {
 
       updateDistanceDisplay();
     },
-    (err) => {
-      // Previously both of these collapsed into a generic disabled button
-      // with no explanation — now they're distinguishable, visible states.
-      // GeolocationPositionError codes: 1 = PERMISSION_DENIED,
-      // 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT.
-      if (err.code === 1) {
-        setStatusPill("denied", "Location access denied — enable it in browser settings.");
-      } else {
-        setStatusPill("nosignal", "No GPS signal — move to open sky and retry.");
-      }
+    () => {
+      document.getElementById("status-pill").textContent = "Location access needed";
       document.getElementById("checkin-button").disabled = true;
     },
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
   );
-}
-
-function setStatusPill(kind, text) {
-  const pill = document.getElementById("status-pill");
-  pill.textContent = text;
-  pill.className = `status-pill status-${kind}`;
 }
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
@@ -429,13 +384,15 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
 }
 
 function updateDistanceDisplay() {
+  const pill = document.getElementById("status-pill");
   const button = document.getElementById("checkin-button");
   const site = state.sites.find((s) => s.id === state.selectedSiteId);
 
   updateSiteOnMap();
 
   if (!state.currentPosition || !site) {
-    setStatusPill("idle", "Locating…");
+    pill.textContent = "Locating…";
+    pill.className = "status-pill status-idle";
     return;
   }
 
@@ -448,10 +405,10 @@ function updateDistanceDisplay() {
   state.distanceToSite = distance;
   const inside = distance <= site.radius_meters;
 
-  setStatusPill(
-    inside ? "inside" : "outside",
-    inside ? `Inside range · ${Math.round(distance)}m` : `Outside range · ${Math.round(distance)}m`
-  );
+  pill.textContent = inside
+    ? `Inside range · ${Math.round(distance)}m`
+    : `Outside range · ${Math.round(distance)}m`;
+  pill.className = `status-pill ${inside ? "status-inside" : "status-outside"}`;
 
   // Client-side distance is shown for the worker's own feedback only - the
   // server independently recomputes it and is the source of truth.
@@ -465,7 +422,9 @@ document.getElementById("checkin-button").addEventListener("click", async () => 
     return;
   }
 
-  setButtonLoading(button, true);
+  button.disabled = true;
+  const originalText = button.textContent;
+  button.textContent = "Submitting…";
 
   try {
     const result = await Api.checkIn({
@@ -491,7 +450,7 @@ document.getElementById("checkin-button").addEventListener("click", async () => 
     vibrate([300]);
     showToast(err.message, "error");
   } finally {
-    setButtonLoading(button, false);
+    button.disabled = false;
     updateCheckinButton(); // loadHistory() already refreshed state.isCheckedIn
   }
 });
