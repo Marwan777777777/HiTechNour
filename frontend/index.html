@@ -93,12 +93,46 @@
         <p id="login-error" class="error-text hidden"></p>
       </form>
 
+      <div class="login-company-links" aria-label="HiTechNour company links">
+        <button type="button" class="company-link company-link-about" id="open-company-about">About Hitechnour</button>
+        <span class="company-link-separator" aria-hidden="true"></span>
+        <a class="company-link" href="https://hitechnour.net/" target="_blank" rel="noopener noreferrer">Website</a>
+        <a class="company-link" href="https://hitechnour.net/partners/" target="_blank" rel="noopener noreferrer">Partners</a>
+        <a class="company-link" href="https://hitechnour.net/contact-us/" target="_blank" rel="noopener noreferrer">Contact</a>
+      </div>
+
+      <div class="login-social-links" aria-label="HiTechNour social media">
+        <a class="social-link" href="https://www.facebook.com/HTNTechnologies/" target="_blank" rel="noopener noreferrer" aria-label="HiTechNour on Facebook">f</a>
+        <a class="social-link social-link-in" href="https://eg.linkedin.com/company/hitechnourtechnologies-htn" target="_blank" rel="noopener noreferrer" aria-label="HiTechNour on LinkedIn">in</a>
+      </div>
+
       <div class="login-footer">
         <span>HiTechNour Attendance</span>
         <span>Secure workforce access</span>
       </div>
     </div>
   </div>
+</div>
+
+<div id="company-about-dialog" class="company-about-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="company-about-title">
+  <div class="company-about-backdrop" data-close-company-about></div>
+  <section class="company-about-card">
+    <button type="button" class="company-about-close" id="close-company-about" aria-label="Close">×</button>
+    <div class="company-about-brand">
+      <img src="icons/logo.svg" alt="HiTechNour" />
+      <div>
+        <strong>HiTechNour Technologies</strong>
+        <span>Established 2005 · Cairo, Egypt</span>
+      </div>
+    </div>
+    <span class="company-about-kicker">WHO WE ARE</span>
+    <h2 id="company-about-title">Integrated security technology, from design to support.</h2>
+    <p>HTN is a leading company in the Egyptian market in the field of integrated security solutions. Established in 2005, HTN specializes in the supply, installation and programming of security solutions, providing comprehensive technology from design and integration through implementation and support.</p>
+    <div class="company-about-actions">
+      <a href="https://hitechnour.net/" target="_blank" rel="noopener noreferrer" class="primary-button">Visit hitechnour.net</a>
+      <a href="https://hitechnour.net/partners/" target="_blank" rel="noopener noreferrer" class="secondary-button">View partners</a>
+    </div>
+  </section>
 </div>
 
 <div id="app-screen" class="screen hidden">
@@ -232,6 +266,30 @@
     button?.setAttribute("aria-label", isPassword ? "Hide password" : "Show password");
     button?.setAttribute("title", isPassword ? "Hide password" : "Show password");
   });
+
+  (() => {
+    const dialog = document.getElementById("company-about-dialog");
+    const openButton = document.getElementById("open-company-about");
+    const closeButton = document.getElementById("close-company-about");
+    if (!dialog || !openButton || !closeButton) return;
+
+    const close = () => {
+      dialog.classList.add("hidden");
+      document.body.classList.remove("company-dialog-open");
+    };
+    const open = () => {
+      dialog.classList.remove("hidden");
+      document.body.classList.add("company-dialog-open");
+      closeButton.focus();
+    };
+
+    openButton.addEventListener("click", open);
+    closeButton.addEventListener("click", close);
+    dialog.querySelector("[data-close-company-about]")?.addEventListener("click", close);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !dialog.classList.contains("hidden")) close();
+    });
+  })();
 </script>
 </body>
 </html>
