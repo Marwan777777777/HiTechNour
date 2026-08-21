@@ -152,38 +152,7 @@
         </select>
       </label>
       <button id="save-profile-btn" class="primary-button" data-i18n="save">Save</button>
-      <button id="delete-account-btn" class="secondary-button" style="margin-top:1rem;color:#EF4444" data-i18n="deleteAccount">Delete my account</button>
     </div>
-  </main>
-</div>
-
-<div id="admin-screen" class="screen hidden">
-  <header class="topbar">
-    <div class="topbar-brand">
-      <img src="icons/logo-htn.png" alt="" onerror="this.style.display='none'" />
-      <span>HiTechNour · Admin</span>
-    </div>
-    <div class="topbar-user">
-      <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
-      <span id="admin-user-name"></span>
-      <button id="admin-logout-button" class="icon-button" title="Sign out" aria-label="Sign out">⏻</button>
-    </div>
-  </header>
-  <nav class="tabs">
-    <button class="tab-button active" data-tab="flagged">Review Queue</button>
-    <button class="tab-button" data-tab="team">Team</button>
-    <button class="tab-button" data-tab="workers">Workers</button>
-    <button class="tab-button" data-tab="assignments">Assignments</button>
-    <button class="tab-button" data-tab="sites">Sites</button>
-    <button class="tab-button" data-tab="export">Export</button>
-  </nav>
-  <main class="main-content">
-    <section id="tab-flagged" class="tab-panel"><h2>Flagged Check-ins</h2><ul id="flagged-list" class="admin-list"></ul></section>
-    <section id="tab-team" class="tab-panel hidden"><h2>Team</h2><button id="add-user-button" class="secondary-button">+ Add Worker</button><ul id="team-list" class="admin-list"></ul></section>
-    <section id="tab-workers" class="tab-panel hidden"><h2>Workers</h2><label>Month <input type="month" id="workers-month" /></label><ul id="workers-list" class="admin-list"></ul></section>
-    <section id="tab-assignments" class="tab-panel hidden"><h2>Assignments</h2><label>Date <input type="date" id="assignments-date" /></label><button id="add-assignment-button" class="secondary-button">+ Assign Worker</button><ul id="assignments-list" class="admin-list"></ul></section>
-    <section id="tab-sites" class="tab-panel hidden"><h2>Sites</h2><div class="button-row"><button id="add-site-button" class="secondary-button">+ Add Site</button><button id="manage-skills-button" class="secondary-button">+ Manage Skill Tags</button></div><ul id="sites-list" class="admin-list"></ul></section>
-    <section id="tab-export" class="tab-panel hidden"><h2>Export Report</h2><label>Start Date <input type="date" id="export-start" /></label><label>End Date <input type="date" id="export-end" /></label><button id="export-button" class="primary-button"><span class="btn-label">Download CSV</span><span class="btn-spinner hidden" aria-hidden="true"></span></button></section>
   </main>
 </div>
 
@@ -211,7 +180,6 @@
 <script src="js/i18n.js"></script>
 <script src="js/notify.js"></script>
 <script src="js/app.js"></script>
-<script src="js/admin.js"></script>
 <script>
   document.getElementById("toggle-password")?.addEventListener("click", () => {
     const input = document.getElementById("login-password");
