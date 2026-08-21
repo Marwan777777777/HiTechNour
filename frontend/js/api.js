@@ -1,12 +1,6 @@
 // ---- Configuration ----
-// Set this to your deployed backend URL before shipping.
 const API_BASE_URL = window.HTN_API_BASE_URL || "http://localhost:4000/api";
 
-// ---- Device ID ----
-// Not a real hardware fingerprint (a browser can't access that) - a
-// random UUID generated once and persisted in localStorage. This is a
-// soft anti-sharing signal, not a hard security boundary. See the admin
-// approval workflow on the backend for how misuse is caught instead.
 function getDeviceId() {
   let id = localStorage.getItem("htn_device_id");
   if (!id) {
@@ -16,7 +10,6 @@ function getDeviceId() {
   return id;
 }
 
-// ---- Token storage ----
 const Auth = {
   getToken: () => localStorage.getItem("htn_token"),
   setToken: (token) => localStorage.setItem("htn_token", token),
@@ -33,7 +26,6 @@ const Auth = {
   },
 };
 
-// ---- Offline queue (IndexedDB) ----
 const OfflineQueue = (() => {
   const DB_NAME = "htn_offline";
   const STORE = "queue";
@@ -59,10 +51,7 @@ const OfflineQueue = (() => {
     const db = await open();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).add({
-        ...item,
-        created: Date.now(),
-      });
+      tx.objectStore(STORE).add({ ...item, created: Date.now() });
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -96,7 +85,6 @@ const OfflineQueue = (() => {
   return { enqueue, list, remove, count };
 })();
 
-// ---- Fetch wrapper ----
 async function apiRequest(path, { method = "GET", body, isBlob = false } = {}) {
   const headers = { "Content-Type": "application/json" };
   const token = Auth.getToken();
@@ -172,6 +160,7 @@ const Api = {
   getTeamBySite: () => apiRequest("/reports/team"),
   getWorkerDaily: (id, month) => apiRequest(`/users/${id}/daily${month ? `?month=${month}` : ""}`),
   updateUser: (id, patch) => apiRequest(`/users/${id}`, { method: "PATCH", body: patch }),
+  deleteUser: (id) => apiRequest(`/users/${id}`, { method: "DELETE" }),
   getAllCheckins: () => apiRequest("/checkins"),
   createSite: (site) => apiRequest("/sites", { method: "POST", body: site }),
   updateSite: (id, patch) => apiRequest(`/sites/${id}`, { method: "PUT", body: patch }),
@@ -183,7 +172,9 @@ const Api = {
   exportCsv: (startDate, endDate) =>
     apiRequest(`/checkins/export?startDate=${startDate}&endDate=${endDate}`, { isBlob: true }),
 
-  getUsers: () => apiRequest("/users"),
+  // Active users only by default; pass true to include deactivated
+  getUsers: (includeInactive = false) =>
+    apiRequest(`/users${includeInactive ? "?includeInactive=1" : ""}`),
   createUser: (user) => apiRequest("/users", { method: "POST", body: user }),
   approveDevice: (id) => apiRequest(`/users/${id}/approve-device`, { method: "POST" }),
   resetDevice: (id) => apiRequest(`/users/${id}/reset-device`, { method: "POST" }),
@@ -191,7 +182,6 @@ const Api = {
   resetPassword: (id, newPassword) =>
     apiRequest(`/users/${id}/reset-password`, { method: "POST", body: { newPassword } }),
 
-  // Self-service profile
   updateMyProfile: (patch) => apiRequest("/users/me", { method: "PATCH", body: patch }),
   deleteMyAccount: () => apiRequest("/users/me", { method: "DELETE" }),
 
@@ -202,7 +192,6 @@ const Api = {
   updateAssignment: (id, patch) => apiRequest(`/assignments/${id}`, { method: "PATCH", body: patch }),
   deleteAssignment: (id) => apiRequest(`/assignments/${id}`, { method: "DELETE" }),
 
-  // ---- Field Ops (new) ----
   submitReport: (payload) => apiRequest("/field/reports", { method: "POST", body: payload }),
   myReports: () => apiRequest("/field/reports/me"),
   allReports: (openOnly) => apiRequest(`/field/reports${openOnly ? "?open=true" : ""}`),
@@ -223,7 +212,6 @@ const Api = {
   getActivity: () => apiRequest("/field/activity"),
 };
 
-// Helper: try online, fall back to offline queue for check-ins & reports
 async function checkInWithOffline(payload) {
   if (!navigator.onLine) {
     await OfflineQueue.enqueue({ kind: "checkin", payload });
@@ -272,7 +260,6 @@ async function flushOfflineQueue() {
   return synced;
 }
 
-// Auto-flush when back online
 if (typeof window !== "undefined") {
   window.addEventListener("online", () => {
     flushOfflineQueue().then((n) => {
