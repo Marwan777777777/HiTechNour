@@ -10,6 +10,7 @@ const checkinRoutes = require("./routes/checkins");
 const assignmentRoutes = require("./routes/assignments");
 const skillRoutes = require("./routes/skills");
 const reportRoutes = require("./routes/reports");
+const fieldRoutes = require("./routes/field");
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use("/api/checkins", checkinRoutes);
 app.use("/api/assignments", assignmentRoutes);
 app.use("/api/skills", skillRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/field", fieldRoutes);
 
 // 404 handler
 app.use((req, res) => {
