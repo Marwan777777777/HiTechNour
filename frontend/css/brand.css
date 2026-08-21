@@ -1,10 +1,10 @@
-/* HiTechNour brand marks + spinning boot logo (HTN mark) — Dark Navy */
+/* HiTechNour brand marks + spinning boot logo — Dark Navy */
 .boot-screen{
   position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:var(--bg,#0B1220);gap:16px;z-index:999;
 }
 .boot-logo-img{
-  width:120px;height:auto;animation:htn-spin 1.4s linear infinite;
+  width:140px;height:auto;animation:htn-spin 1.4s linear infinite;
   filter:drop-shadow(0 8px 20px rgba(59,130,246,0.35));
 }
 @keyframes htn-spin{to{transform:rotate(360deg);}}
@@ -14,11 +14,13 @@
 }
 .boot-sub{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--ink-faint,#5A6A85);}
 
-.brand-logo-img{width:56px;height:auto;margin:0 auto 12px;display:block;}
+.brand-logo-img{width:88px;height:auto;margin:0 auto 12px;display:block;border-radius:12px;}
 .topbar-brand{display:flex;align-items:center;gap:10px;}
-.topbar-brand img{width:28px;height:28px;object-fit:contain;border-radius:6px;}
+.topbar-brand img{width:32px;height:32px;object-fit:contain;border-radius:8px;}
 .topbar-brand span{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;}
 .topbar-title::before{display:none !important;}
+
+.brand-mark-img{width:40px;height:40px;border-radius:10px;object-fit:contain;background:transparent !important;}
 
 @media(prefers-reduced-motion:reduce){
   .boot-logo-img{animation:none;}
