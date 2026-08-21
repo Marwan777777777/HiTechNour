@@ -110,7 +110,60 @@ function boot() {
 
   document.getElementById("feedSearch").addEventListener("input", renderFeed);
 
+  // ---- Add Worker ----
+  document.getElementById("openAddWorkerBtn").addEventListener("click", openAddWorkerModal);
+  document.getElementById("addWorkerCloseBtn").addEventListener("click", closeAddWorkerModal);
+  document.getElementById("addWorkerOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "addWorkerOverlay") closeAddWorkerModal();
+  });
+  document.getElementById("addWorkerForm").addEventListener("submit", handleAddWorkerSubmit);
+
   loadOverview();
+}
+
+function openAddWorkerModal() {
+  document.getElementById("addWorkerForm").reset();
+  document.getElementById("addWorkerError").classList.add("hidden");
+  document.getElementById("addWorkerOverlay").classList.add("open");
+}
+
+function closeAddWorkerModal() {
+  document.getElementById("addWorkerOverlay").classList.remove("open");
+}
+
+async function handleAddWorkerSubmit(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById("addWorkerError");
+  const submitBtn = document.getElementById("addWorkerSubmitBtn");
+  errorEl.classList.add("hidden");
+
+  const fullName = document.getElementById("awFullName").value.trim();
+  const username = document.getElementById("awUsername").value.trim();
+  const password = document.getElementById("awPassword").value;
+  const phone = document.getElementById("awPhone").value.trim();
+  const role = document.getElementById("awRole").value;
+
+  if (password.length < 8) {
+    errorEl.textContent = "Password must be at least 8 characters.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Adding…";
+  try {
+    await Api.createUser({ username, password, fullName, phone: phone || undefined, role });
+    showToast(`${fullName} added.`, "success");
+    closeAddWorkerModal();
+    state.team = null; // force a refresh next time Team is opened
+    if (document.getElementById("page-team").classList.contains("active")) loadTeam();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove("hidden");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Add Worker";
+  }
 }
 
 function closeSidebarOnMobile() {
