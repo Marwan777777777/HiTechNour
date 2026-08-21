@@ -222,10 +222,46 @@
       </div>
 
       <!-- ============ PLACEHOLDER PAGES (not built yet) ============ -->
-      <div class="page" id="page-attendance"><div class="panel"><div class="panel-body">
-        <div class="classic-note">Full attendance log &amp; CSV export are on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
-        <div style="padding:30px;text-align:center;color:var(--ink-faint);">Full attendance log view — coming to this dashboard next.</div>
-      </div></div></div>
+      <div class="page" id="page-attendance">
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">From</label>
+              <input type="date" id="attStart" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" />
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">To</label>
+              <input type="date" id="attEnd" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" />
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Site</label>
+              <select id="attSiteFilter" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;background:#fff;min-width:150px;"><option value="">All sites</option></select>
+            </div>
+            <div style="flex:1;min-width:160px;">
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Worker</label>
+              <input type="text" id="attSearch" placeholder="Search by name…" style="width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;" />
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label>
+              <button id="attFlaggedOnly" style="border:1px solid var(--line-strong);background:#fff;border-radius:8px;padding:9px 13px;font-size:12.5px;font-weight:600;color:var(--ink-dim);cursor:pointer;">Flagged only</button>
+            </div>
+            <div>
+              <label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label>
+              <button id="attExportBtn" style="border:none;background:var(--blue);color:#fff;border-radius:8px;padding:9px 15px;font-size:12.5px;font-weight:700;cursor:pointer;">Download CSV</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Check-in / Check-out Log</h3><span id="attCount" style="font-size:11.5px;color:var(--ink-faint);font-weight:600;"></span></div>
+          <div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;">
+            <table>
+              <thead><tr><th>Worker</th><th>Site</th><th>Type</th><th>Time</th><th>Distance</th><th>Status</th></tr></thead>
+              <tbody id="attTableBody"></tbody>
+            </table>
+            <div id="attEmpty" class="empty-note hidden">No check-ins match these filters.</div>
+          </div>
+        </div>
+      </div>
       <div class="page" id="page-sites"><div class="panel"><div class="panel-body">
         <div class="classic-note">Site management &amp; skill requirements are on the classic panel for now — <a href="index.html?classic=1">open it here</a>.</div>
         <div style="padding:30px;text-align:center;color:var(--ink-faint);">Site directory with map pins — coming to this dashboard next.</div>
