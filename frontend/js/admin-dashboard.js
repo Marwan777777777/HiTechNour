@@ -192,9 +192,113 @@ function showPage(name) {
 
   if (name === "team" && !state.team) loadTeam();
   if (name === "attendance" && !state.attendance) loadAttendanceLog();
+  if (name === "devices") loadDevices();
   if (name === "activityfeed" && !state.feed) loadActivityFeed();
   if (name === "anomalies") loadAnomaliesFull();
 }
+
+// ---- Devices ----
+async function loadDevices() {
+  const tbody = document.getElementById("devTableBody");
+  try {
+    state.devices = await Api.getUsers();
+    renderDevices();
+  } catch (err) {
+    tbody.innerHTML = "";
+    document.getElementById("devEmpty").textContent = err.message;
+    document.getElementById("devEmpty").classList.remove("hidden");
+  }
+}
+
+function deviceStatusMeta(u) {
+  if (u.device_pending) return { label: "Pending approval", cls: "status-late" };
+  if (u.device_approved) return { label: "Approved", cls: "status-present" };
+  return { label: "No device registered", cls: "status-absent" };
+}
+
+function renderDevices() {
+  if (!state.devices) return;
+  const search = (document.getElementById("devSearch").value || "").toLowerCase();
+  let rows = state.devices;
+  if (search) rows = rows.filter((u) => u.full_name.toLowerCase().includes(search));
+
+  const pendingCount = state.devices.filter((u) => u.device_pending).length;
+  const badge = document.getElementById("devPendingBadge");
+  if (pendingCount > 0) {
+    badge.textContent = `${pendingCount} pending`;
+    badge.classList.remove("hidden");
+  } else {
+    badge.classList.add("hidden");
+  }
+
+  const tbody = document.getElementById("devTableBody");
+  const empty = document.getElementById("devEmpty");
+  if (!rows.length) {
+    tbody.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+
+  tbody.innerHTML = rows
+    .map((u) => {
+      const meta = deviceStatusMeta(u);
+      const bound = u.device_bound_at ? new Date(u.device_bound_at).toLocaleDateString() : "—";
+      let actions = "";
+      if (u.device_pending) {
+        actions += `<button class="secondary-button" style="margin:0 6px 0 0;" data-approve="${u.id}">Approve</button>`;
+      }
+      if (u.device_approved || u.device_pending) {
+        actions += `<button class="secondary-button" style="margin:0 6px 0 0;" data-reset="${u.id}">Reset</button>`;
+      }
+      actions += `<button class="secondary-button" style="margin:0;color:var(--red);border-color:#f3c9c9;" data-logout="${u.id}" data-name="${u.full_name}">Force Sign-out</button>`;
+      return `
+      <tr>
+        <td class="name-cell"><div class="avatar-sm">${initials(u.full_name)}</div>${u.full_name}</td>
+        <td><span class="status-pill ${meta.cls}">${meta.label}</span></td>
+        <td class="mono">${bound}</td>
+        <td style="white-space:nowrap;">${actions}</td>
+      </tr>`;
+    })
+    .join("");
+
+  tbody.querySelectorAll("[data-approve]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      try {
+        await Api.approveDevice(btn.dataset.approve);
+        showToast("Device approved.", "success");
+        await loadDevices();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    })
+  );
+  tbody.querySelectorAll("[data-reset]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      if (!confirm("Reset this worker's bound device? They'll need re-approval on their next check-in.")) return;
+      try {
+        await Api.resetDevice(btn.dataset.reset);
+        showToast("Device binding reset.", "success");
+        await loadDevices();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    })
+  );
+  tbody.querySelectorAll("[data-logout]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      if (!confirm(`Sign out ${btn.dataset.name} on every device? They'll need to log in again next time.`)) return;
+      try {
+        await Api.forceLogout(btn.dataset.logout);
+        showToast(`${btn.dataset.name} signed out on all devices.`, "success");
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    })
+  );
+}
+
+document.getElementById("devSearch").addEventListener("input", renderDevices);
 
 // ---- Attendance (full log) ----
 async function loadAttendanceLog() {
