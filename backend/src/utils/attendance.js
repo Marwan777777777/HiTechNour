@@ -39,4 +39,40 @@ async function getMonthlyAttendance(userId, monthParam) {
   };
 }
 
-module.exports = { resolveMonth, getMonthlyAttendance, isValidMonthString };
+// Pairs check_in/check_out events chronologically to compute hours worked
+// per calendar day - used for the Monthly Report chart. An open shift (a
+// check_in with no matching check_out yet) isn't counted until it closes,
+// so "today" may show 0h until the worker checks out.
+async function getDailyHours(userId, monthParam) {
+  const { month, start, end, daysInMonth } = resolveMonth(monthParam);
+
+  const { rows } = await pool.query(
+    `SELECT type, created_at
+     FROM checkins
+     WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
+     ORDER BY created_at ASC`,
+    [userId, start, end]
+  );
+
+  const hoursByDay = {};
+  let openSince = null;
+  for (const row of rows) {
+    if (row.type === "check_in") {
+      openSince = row.created_at;
+    } else if (row.type === "check_out" && openSince) {
+      const day = openSince.getUTCDate();
+      const hrs = (row.created_at - openSince) / 3600000;
+      hoursByDay[day] = (hoursByDay[day] || 0) + hrs;
+      openSince = null;
+    }
+  }
+
+  const days = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    days.push({ day: d, hours: Math.round((hoursByDay[d] || 0) * 10) / 10 });
+  }
+
+  return { month, daysInMonth, days };
+}
+
+module.exports = { resolveMonth, getMonthlyAttendance, getDailyHours, isValidMonthString };
