@@ -9,10 +9,6 @@ function isValidDateString(s) {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(s).getTime());
 }
 
-// Worker: today's assignment, if any - this is what drives "here's your
-// site" on the check-in screen instead of a manual dropdown. If a worker
-// has more than one assignment overlapping today (rare - e.g. handoff
-// mid-day), return all of them and let the frontend show a short list.
 router.get("/me/today", requireAuth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -30,7 +26,6 @@ router.get("/me/today", requireAuth, async (req, res, next) => {
   }
 });
 
-// Worker: their upcoming + recent assignments, for a "my schedule" view.
 router.get("/me", requireAuth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -48,8 +43,6 @@ router.get("/me", requireAuth, async (req, res, next) => {
   }
 });
 
-// Admin: list assignments, optionally filtered to a specific date
-// (defaults to today) - this is "who's assigned where right now".
 router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const date = isValidDateString(req.query.date) ? req.query.date : null;
@@ -70,8 +63,6 @@ router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
   }
 });
 
-// Admin: create an assignment (assign a worker to a site for a date range,
-// with an optional task description).
 router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { userId, siteId, task, startDate, endDate } = req.body;
@@ -92,13 +83,29 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
        RETURNING id, user_id, site_id, task, start_date, end_date`,
       [userId, siteId, task || null, startDate, finalEndDate, req.user.id]
     );
+
+    // Notify the worker about team / site assignment
+    try {
+      const site = await pool.query("SELECT name FROM sites WHERE id = $1", [siteId]);
+      const siteName = site.rows[0]?.name || "a site";
+      const taskLabel = task ? ` · ${task}` : "";
+      await pool.query(
+        `INSERT INTO notifications (user_id, title, body, kind) VALUES ($1, $2, $3, $4)`,
+        [
+          userId,
+          "New assignment",
+          `You are assigned to ${siteName} (${startDate}${finalEndDate !== startDate ? " → " + finalEndDate : ""})${taskLabel}`,
+          "assignment",
+        ]
+      );
+    } catch (_) {}
+
     res.status(201).json(rows[0]);
   } catch (err) {
     next(err);
   }
 });
 
-// Admin: edit an assignment (reassign site, change task, extend/shorten dates).
 router.patch("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { siteId, task, startDate, endDate } = req.body;
@@ -129,7 +136,6 @@ router.patch("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   }
 });
 
-// Admin: remove an assignment.
 router.delete("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query("DELETE FROM assignments WHERE id = $1 RETURNING id", [req.params.id]);
