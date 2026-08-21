@@ -33,6 +33,69 @@ const Auth = {
   },
 };
 
+// ---- Offline queue (IndexedDB) ----
+const OfflineQueue = (() => {
+  const DB_NAME = "htn_offline";
+  const STORE = "queue";
+  let dbPromise = null;
+
+  function open() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          db.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return dbPromise;
+  }
+
+  async function enqueue(item) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).add({
+        ...item,
+        created: Date.now(),
+      });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function list() {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly");
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function remove(id) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function count() {
+    const items = await list();
+    return items.length;
+  }
+
+  return { enqueue, list, remove, count };
+})();
+
 // ---- Fetch wrapper ----
 async function apiRequest(path, { method = "GET", body, isBlob = false } = {}) {
   const headers = { "Content-Type": "application/json" };
@@ -52,16 +115,10 @@ async function apiRequest(path, { method = "GET", body, isBlob = false } = {}) {
 
   if (response.status === 401) {
     if (token) {
-      // We sent a token and got rejected - that's a genuinely dead/expired
-      // session, so force back to login.
       Auth.logout();
       window.location.reload();
       throw new Error("Session expired. Please sign in again.");
     }
-    // No token was sent (e.g. this was a login attempt itself) - a 401
-    // here just means wrong username/password, not an expired session.
-    // Fall through so the real error message reaches the caller instead
-    // of getting masked by a reload.
   }
 
   if (isBlob) {
@@ -128,12 +185,15 @@ const Api = {
 
   getUsers: () => apiRequest("/users"),
   createUser: (user) => apiRequest("/users", { method: "POST", body: user }),
-  updateUser: (id, patch) => apiRequest(`/users/${id}`, { method: "PATCH", body: patch }),
   approveDevice: (id) => apiRequest(`/users/${id}/approve-device`, { method: "POST" }),
   resetDevice: (id) => apiRequest(`/users/${id}/reset-device`, { method: "POST" }),
   forceLogout: (id) => apiRequest(`/users/${id}/force-logout`, { method: "POST" }),
   resetPassword: (id, newPassword) =>
     apiRequest(`/users/${id}/reset-password`, { method: "POST", body: { newPassword } }),
+
+  // Self-service profile
+  updateMyProfile: (patch) => apiRequest("/users/me", { method: "PATCH", body: patch }),
+  deleteMyAccount: () => apiRequest("/users/me", { method: "DELETE" }),
 
   myAssignmentToday: () => apiRequest("/assignments/me/today"),
   mySchedule: () => apiRequest("/assignments/me"),
@@ -141,4 +201,84 @@ const Api = {
   createAssignment: (a) => apiRequest("/assignments", { method: "POST", body: a }),
   updateAssignment: (id, patch) => apiRequest(`/assignments/${id}`, { method: "PATCH", body: patch }),
   deleteAssignment: (id) => apiRequest(`/assignments/${id}`, { method: "DELETE" }),
+
+  // ---- Field Ops (new) ----
+  submitReport: (payload) => apiRequest("/field/reports", { method: "POST", body: payload }),
+  myReports: () => apiRequest("/field/reports/me"),
+  allReports: (openOnly) => apiRequest(`/field/reports${openOnly ? "?open=true" : ""}`),
+  reviewReport: (id) => apiRequest(`/field/reports/${id}/review`, { method: "PATCH" }),
+
+  getSurveys: () => apiRequest("/field/surveys"),
+  answerSurvey: (id, answer) =>
+    apiRequest(`/field/surveys/${id}/answer`, { method: "POST", body: { answer } }),
+  createSurvey: (payload) => apiRequest("/field/surveys", { method: "POST", body: payload }),
+
+  getAnnouncements: () => apiRequest("/field/announcements"),
+  createAnnouncement: (payload) =>
+    apiRequest("/field/announcements", { method: "POST", body: payload }),
+
+  getNotifications: () => apiRequest("/field/notifications"),
+  markNotificationsRead: () => apiRequest("/field/notifications/read", { method: "POST" }),
+
+  getActivity: () => apiRequest("/field/activity"),
 };
+
+// Helper: try online, fall back to offline queue for check-ins & reports
+async function checkInWithOffline(payload) {
+  if (!navigator.onLine) {
+    await OfflineQueue.enqueue({ kind: "checkin", payload });
+    return { offline: true, message: "Saved offline – will sync when online." };
+  }
+  try {
+    return await Api.checkIn(payload);
+  } catch (err) {
+    if (err.message.includes("Network error")) {
+      await OfflineQueue.enqueue({ kind: "checkin", payload });
+      return { offline: true, message: "Saved offline – will sync when online." };
+    }
+    throw err;
+  }
+}
+
+async function submitReportWithOffline(payload) {
+  if (!navigator.onLine) {
+    await OfflineQueue.enqueue({ kind: "report", payload });
+    return { offline: true, message: "Report saved offline – will sync when online." };
+  }
+  try {
+    return await Api.submitReport(payload);
+  } catch (err) {
+    if (err.message.includes("Network error")) {
+      await OfflineQueue.enqueue({ kind: "report", payload });
+      return { offline: true, message: "Report saved offline – will sync when online." };
+    }
+    throw err;
+  }
+}
+
+async function flushOfflineQueue() {
+  const items = await OfflineQueue.list();
+  let synced = 0;
+  for (const item of items) {
+    try {
+      if (item.kind === "checkin") await Api.checkIn(item.payload);
+      else if (item.kind === "report") await Api.submitReport(item.payload);
+      await OfflineQueue.remove(item.id);
+      synced++;
+    } catch {
+      // keep for next attempt
+    }
+  }
+  return synced;
+}
+
+// Auto-flush when back online
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => {
+    flushOfflineQueue().then((n) => {
+      if (n > 0 && window.showToast) {
+        window.showToast(`${n} offline item(s) synced`, "success");
+      }
+    });
+  });
+}
