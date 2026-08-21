@@ -1,0 +1,25 @@
+/* HiTechNour brand marks + spinning boot logo (HTN mark) */
+.boot-screen{
+  position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:var(--bg,#F6F8FC);gap:16px;z-index:999;
+}
+.boot-logo-img{
+  width:120px;height:auto;animation:htn-spin 1.4s linear infinite;
+  filter:drop-shadow(0 8px 20px rgba(37,87,214,0.25));
+}
+@keyframes htn-spin{to{transform:rotate(360deg);}}
+.boot-logo-text{
+  font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--ink,#0F1A33);
+  letter-spacing:0.02em;
+}
+.boot-sub{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--ink-faint,#94A0B8);}
+
+.brand-logo-img{width:56px;height:auto;margin:0 auto 12px;display:block;}
+.topbar-brand{display:flex;align-items:center;gap:10px;}
+.topbar-brand img{width:28px;height:28px;object-fit:contain;border-radius:6px;}
+.topbar-brand span{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;}
+.topbar-title::before{display:none !important;}
+
+@media(prefers-reduced-motion:reduce){
+  .boot-logo-img{animation:none;}
+}

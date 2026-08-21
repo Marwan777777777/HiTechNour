@@ -3,14 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>HighTechNour Attendance</title>
+<title>HiTechNour Attendance</title>
 
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#F6F8FC" />
+<meta name="theme-color" content="#2557D6" />
+<link rel="icon" type="image/png" href="icons/icon-192.png" />
 
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="HTN Attendance" />
+<meta name="apple-mobile-web-app-title" content="HiTechNour" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,13 +19,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
 <link rel="stylesheet" href="css/styles.css" />
+<link rel="stylesheet" href="css/brand.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
 
 <div id="boot-screen" class="boot-screen">
-  <div class="boot-logo">HighTechNour</div>
-  <div class="boot-ring"></div>
+  <img class="boot-logo-img" src="icons/logo-htn.png" alt="HTN" onerror="this.style.display='none'" />
+  <div class="boot-logo-text">HiTechNour</div>
   <div class="boot-sub">ATTENDANCE</div>
 </div>
 
@@ -34,12 +36,8 @@
       <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
     </div>
     <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="26" cy="26" r="24" stroke="#D8DEEB" stroke-width="1.5"/>
-        <circle cx="26" cy="26" r="16" stroke="#B8C6EE" stroke-width="1.5" stroke-dasharray="2 3"/>
-        <circle cx="26" cy="26" r="6" fill="#2557D6"/>
-      </svg>
-      <h1 data-i18n="appName">HighTechNour</h1>
+      <img class="brand-logo-img" src="icons/logo-hitech.png" alt="HiTechNour" onerror="this.src='icons/logo-htn.png'" />
+      <h1 data-i18n="appName">HiTechNour</h1>
       <p class="brand-sub" data-i18n="siteAttendance">Site Attendance</p>
     </div>
     <form id="login-form">
@@ -63,7 +61,10 @@
 
 <div id="app-screen" class="screen hidden">
   <header class="topbar">
-    <div class="topbar-title">HighTechNour</div>
+    <div class="topbar-brand">
+      <img src="icons/logo-htn.png" alt="" onerror="this.style.display='none'" />
+      <span>HiTechNour</span>
+    </div>
     <div class="topbar-user">
       <span id="offline-badge" class="offline-badge hidden">0 offline</span>
       <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
@@ -80,31 +81,25 @@
   </nav>
 
   <main class="main-content">
-    <!-- HOME -->
     <div id="panel-home" class="worker-panel">
       <div id="device-pending-banner" class="banner banner-warning hidden" data-i18n="pendingDevice">
         Your device is awaiting admin approval. You can't check in until it's approved.
       </div>
-
       <div id="assignment-banner" class="banner banner-assignment hidden"></div>
-
       <div class="map-wrap">
         <div id="site-map" class="site-map">
           <div id="site-map-skeleton" class="site-map-skeleton" aria-hidden="true"></div>
         </div>
         <div id="status-pill" class="status-pill status-idle" data-i18n="locating">Locating…</div>
       </div>
-
       <div class="site-select-wrap">
         <label for="site-select" data-i18n="site">Site</label>
         <select id="site-select"></select>
       </div>
-
       <button id="checkin-button" class="primary-button" disabled>
         <span class="btn-label" data-i18n="checkIn">Check In</span>
         <span class="btn-spinner hidden" aria-hidden="true"></span>
       </button>
-
       <section class="attendance-summary">
         <div class="attendance-summary-head">
           <h2 data-i18n="myAttendance">My Attendance</h2>
@@ -113,14 +108,12 @@
         <div id="attendance-days" class="attendance-days">—</div>
         <div class="attendance-bar"><div id="attendance-bar-fill" class="attendance-bar-fill"></div></div>
       </section>
-
       <section class="history">
         <h2 data-i18n="recentActivity">Recent Activity</h2>
         <ul id="history-list" class="history-list"></ul>
       </section>
     </div>
 
-    <!-- REPORTS -->
     <div id="panel-reports" class="worker-panel hidden">
       <h2 data-i18n="fieldReport">Field Report</h2>
       <label><span data-i18n="title">Title</span>
@@ -130,14 +123,12 @@
         <textarea id="report-body" rows="4" maxlength="4000" data-i18n-placeholder="describeSituation" placeholder="Describe the situation on site…"></textarea>
       </label>
       <button id="submit-report-btn" class="primary-button" data-i18n="submitReport">Submit report</button>
-
       <section class="history" style="margin-top:1.5rem">
         <h2 data-i18n="myReports">My reports</h2>
         <ul id="reports-list" class="history-list"></ul>
       </section>
     </div>
 
-    <!-- ALERTS -->
     <div id="panel-alerts" class="worker-panel hidden">
       <div class="button-row" style="justify-content:space-between;align-items:center">
         <h2 style="margin:0" data-i18n="alerts">Alerts</h2>
@@ -146,7 +137,6 @@
       <ul id="notifications-list" class="history-list" style="margin-top:1rem"></ul>
     </div>
 
-    <!-- PROFILE -->
     <div id="panel-profile" class="worker-panel hidden">
       <h2 data-i18n="profile">Profile</h2>
       <label><span data-i18n="fullName">Full name</span>
@@ -169,14 +159,16 @@
 
 <div id="admin-screen" class="screen hidden">
   <header class="topbar">
-    <div class="topbar-title">HighTechNour · Admin</div>
+    <div class="topbar-brand">
+      <img src="icons/logo-htn.png" alt="" onerror="this.style.display='none'" />
+      <span>HiTechNour · Admin</span>
+    </div>
     <div class="topbar-user">
       <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
       <span id="admin-user-name"></span>
       <button id="admin-logout-button" class="icon-button" title="Sign out" aria-label="Sign out">⏻</button>
     </div>
   </header>
-
   <nav class="tabs">
     <button class="tab-button active" data-tab="flagged">Review Queue</button>
     <button class="tab-button" data-tab="team">Team</button>
@@ -185,45 +177,13 @@
     <button class="tab-button" data-tab="sites">Sites</button>
     <button class="tab-button" data-tab="export">Export</button>
   </nav>
-
   <main class="main-content">
-    <section id="tab-flagged" class="tab-panel">
-      <h2>Flagged Check-ins</h2>
-      <ul id="flagged-list" class="admin-list"></ul>
-    </section>
-    <section id="tab-team" class="tab-panel hidden">
-      <h2>Team</h2>
-      <button id="add-user-button" class="secondary-button">+ Add Worker</button>
-      <ul id="team-list" class="admin-list"></ul>
-    </section>
-    <section id="tab-workers" class="tab-panel hidden">
-      <h2>Workers</h2>
-      <label>Month <input type="month" id="workers-month" /></label>
-      <ul id="workers-list" class="admin-list"></ul>
-    </section>
-    <section id="tab-assignments" class="tab-panel hidden">
-      <h2>Assignments</h2>
-      <label>Date <input type="date" id="assignments-date" /></label>
-      <button id="add-assignment-button" class="secondary-button">+ Assign Worker</button>
-      <ul id="assignments-list" class="admin-list"></ul>
-    </section>
-    <section id="tab-sites" class="tab-panel hidden">
-      <h2>Sites</h2>
-      <div class="button-row">
-        <button id="add-site-button" class="secondary-button">+ Add Site</button>
-        <button id="manage-skills-button" class="secondary-button">+ Manage Skill Tags</button>
-      </div>
-      <ul id="sites-list" class="admin-list"></ul>
-    </section>
-    <section id="tab-export" class="tab-panel hidden">
-      <h2>Export Report</h2>
-      <label>Start Date <input type="date" id="export-start" /></label>
-      <label>End Date <input type="date" id="export-end" /></label>
-      <button id="export-button" class="primary-button">
-        <span class="btn-label">Download CSV</span>
-        <span class="btn-spinner hidden" aria-hidden="true"></span>
-      </button>
-    </section>
+    <section id="tab-flagged" class="tab-panel"><h2>Flagged Check-ins</h2><ul id="flagged-list" class="admin-list"></ul></section>
+    <section id="tab-team" class="tab-panel hidden"><h2>Team</h2><button id="add-user-button" class="secondary-button">+ Add Worker</button><ul id="team-list" class="admin-list"></ul></section>
+    <section id="tab-workers" class="tab-panel hidden"><h2>Workers</h2><label>Month <input type="month" id="workers-month" /></label><ul id="workers-list" class="admin-list"></ul></section>
+    <section id="tab-assignments" class="tab-panel hidden"><h2>Assignments</h2><label>Date <input type="date" id="assignments-date" /></label><button id="add-assignment-button" class="secondary-button">+ Assign Worker</button><ul id="assignments-list" class="admin-list"></ul></section>
+    <section id="tab-sites" class="tab-panel hidden"><h2>Sites</h2><div class="button-row"><button id="add-site-button" class="secondary-button">+ Add Site</button><button id="manage-skills-button" class="secondary-button">+ Manage Skill Tags</button></div><ul id="sites-list" class="admin-list"></ul></section>
+    <section id="tab-export" class="tab-panel hidden"><h2>Export Report</h2><label>Start Date <input type="date" id="export-start" /></label><label>End Date <input type="date" id="export-end" /></label><button id="export-button" class="primary-button"><span class="btn-label">Download CSV</span><span class="btn-spinner hidden" aria-hidden="true"></span></button></section>
   </main>
 </div>
 
@@ -233,10 +193,7 @@
     <div id="modal-body"></div>
     <div class="modal-actions">
       <button id="modal-cancel" class="secondary-button">Cancel</button>
-      <button id="modal-confirm" class="primary-button">
-        <span class="btn-label">Save</span>
-        <span class="btn-spinner hidden" aria-hidden="true"></span>
-      </button>
+      <button id="modal-confirm" class="primary-button"><span class="btn-label">Save</span><span class="btn-spinner hidden" aria-hidden="true"></span></button>
     </div>
   </div>
 </div>
@@ -252,6 +209,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/api.js"></script>
 <script src="js/i18n.js"></script>
+<script src="js/notify.js"></script>
 <script src="js/app.js"></script>
 <script src="js/admin.js"></script>
 <script>
