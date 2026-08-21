@@ -35,6 +35,8 @@ const I18N = {
     error: "Something went wrong",
     syncing: "Syncing offline items…",
     queueCount: "pending offline",
+    home: "Home",
+    alerts: "Alerts",
   },
   ar: {
     appName: "هاي تك نور",
@@ -58,7 +60,7 @@ const I18N = {
     surveys: "استبيانات",
     answer: "إجابة",
     notifications: "التنبيهات",
-    markRead: "تعليم الكل كمقروء",
+    markRead: "علم الكل كمقروء",
     profile: "الملف الشخصي",
     fullName: "الاسم الكامل",
     phone: "الهاتف",
@@ -71,6 +73,8 @@ const I18N = {
     error: "حدث خطأ",
     syncing: "جاري مزامنة العناصر غير المتصلة…",
     queueCount: "في الانتظار بدون إنترنت",
+    home: "الرئيسية",
+    alerts: "التنبيهات",
   },
 };
 
@@ -79,19 +83,57 @@ function t(key) {
   return (I18N[locale] && I18N[locale][key]) || I18N.en[key] || key;
 }
 
+function getLocale() {
+  return localStorage.getItem("htn_locale") || "en";
+}
+
 function setLocale(locale) {
   if (locale !== "en" && locale !== "ar") return;
   localStorage.setItem("htn_locale", locale);
   document.documentElement.lang = locale;
   document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
+  syncLangToggles();
+}
+
+function toggleLocale() {
+  setLocale(getLocale() === "ar" ? "en" : "ar");
+}
+
+function syncLangToggles() {
+  const loc = getLocale();
+  document.querySelectorAll("[data-lang-toggle]").forEach((el) => {
+    el.textContent = loc === "ar" ? "EN" : "ع";
+    el.setAttribute("title", loc === "ar" ? "Switch to English" : "التبديل إلى العربية");
+    el.setAttribute("aria-label", el.getAttribute("title"));
+  });
 }
 
 function initLocale() {
-  const stored = localStorage.getItem("htn_locale") || "en";
+  const stored = getLocale();
   setLocale(stored);
 }
 
-// Call on load
+// Call on load + wire any toggle buttons
 if (typeof document !== "undefined") {
-  initLocale();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      initLocale();
+      document.body.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-lang-toggle]");
+        if (btn) {
+          e.preventDefault();
+          toggleLocale();
+        }
+      });
+    });
+  } else {
+    initLocale();
+    document.body.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-lang-toggle]");
+      if (btn) {
+        e.preventDefault();
+        toggleLocale();
+      }
+    });
+  }
 }
