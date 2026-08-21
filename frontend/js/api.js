@@ -37,16 +37,13 @@ const OfflineQueue = (() => {
       const req = indexedDB.open(DB_NAME, 1);
       req.onupgradeneeded = () => {
         const db = req.result;
-        if (!db.objectStoreNames.contains(STORE)) {
-          db.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
-        }
+        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
     return dbPromise;
   }
-
   async function enqueue(item) {
     const db = await open();
     return new Promise((resolve, reject) => {
@@ -56,7 +53,6 @@ const OfflineQueue = (() => {
       tx.onerror = () => reject(tx.error);
     });
   }
-
   async function list() {
     const db = await open();
     return new Promise((resolve, reject) => {
@@ -66,7 +62,6 @@ const OfflineQueue = (() => {
       req.onerror = () => reject(req.error);
     });
   }
-
   async function remove(id) {
     const db = await open();
     return new Promise((resolve, reject) => {
@@ -76,12 +71,7 @@ const OfflineQueue = (() => {
       tx.onerror = () => reject(tx.error);
     });
   }
-
-  async function count() {
-    const items = await list();
-    return items.length;
-  }
-
+  async function count() { return (await list()).length; }
   return { enqueue, list, remove, count };
 })();
 
@@ -97,65 +87,40 @@ async function apiRequest(path, { method = "GET", body, isBlob = false } = {}) {
       headers,
       body: body ? JSON.stringify(body) : undefined,
     });
-  } catch (networkErr) {
+  } catch (_) {
     throw new Error("Network error - check your connection and try again.");
   }
 
-  if (response.status === 401) {
-    if (token) {
-      Auth.logout();
-      window.location.reload();
-      throw new Error("Session expired. Please sign in again.");
-    }
+  if (response.status === 401 && token) {
+    Auth.logout();
+    window.location.reload();
+    throw new Error("Session expired. Please sign in again.");
   }
 
   if (isBlob) {
     if (!response.ok) throw new Error("Export failed.");
     return response.blob();
   }
-
   let data = null;
-  try {
-    data = await response.json();
-  } catch {
-    // no body
-  }
-
-  if (!response.ok) {
-    throw new Error(data?.error || `Request failed (${response.status}).`);
-  }
+  try { data = await response.json(); } catch (_) {}
+  if (!response.ok) throw new Error(data?.error || `Request failed (${response.status}).`);
   return data;
 }
 
 const Api = {
-  login: (username, password) =>
-    apiRequest("/auth/login", { method: "POST", body: { username, password } }),
+  login: (username, password) => apiRequest("/auth/login", { method: "POST", body: { username, password } }),
   me: () => apiRequest("/auth/me"),
-
   myAttendanceSummary: (month) => apiRequest(`/checkins/me/summary${month ? `?month=${month}` : ""}`),
   workerSummary: (id, month) => apiRequest(`/users/${id}/summary${month ? `?month=${month}` : ""}`),
-
   getSites: () => apiRequest("/sites"),
-
   getSkills: () => apiRequest("/skills"),
   createSkill: (name) => apiRequest("/skills", { method: "POST", body: { name } }),
   getSkillWorkers: (skillId) => apiRequest(`/skills/${skillId}/workers`),
-  setWorkerSkill: (userId, skillId, level, notes) =>
-    apiRequest(`/skills/users/${userId}`, {
-      method: "POST",
-      body: { skillId, level, notes },
-    }),
-  removeWorkerSkill: (userId, skillId) =>
-    apiRequest(`/skills/users/${userId}/${skillId}`, { method: "DELETE" }),
+  setWorkerSkill: (userId, skillId, level, notes) => apiRequest(`/skills/users/${userId}`, { method: "POST", body: { skillId, level, notes } }),
+  removeWorkerSkill: (userId, skillId) => apiRequest(`/skills/users/${userId}/${skillId}`, { method: "DELETE" }),
   getSiteRequirements: (siteId) => apiRequest(`/skills/sites/${siteId}`),
-  setSiteRequirement: (siteId, skillId, workersNeeded) =>
-    apiRequest(`/skills/sites/${siteId}`, {
-      method: "POST",
-      body: { skillId, workersNeeded },
-    }),
-  removeSiteRequirement: (siteId, skillId) =>
-    apiRequest(`/skills/sites/${siteId}/${skillId}`, { method: "DELETE" }),
-
+  setSiteRequirement: (siteId, skillId, workersNeeded) => apiRequest(`/skills/sites/${siteId}`, { method: "POST", body: { skillId, workersNeeded } }),
+  removeSiteRequirement: (siteId, skillId) => apiRequest(`/skills/sites/${siteId}/${skillId}`, { method: "DELETE" }),
   getOverview: () => apiRequest("/reports/overview"),
   getTeamBySite: () => apiRequest("/reports/team"),
   getWorkerDaily: (id, month) => apiRequest(`/users/${id}/daily${month ? `?month=${month}` : ""}`),
@@ -164,51 +129,38 @@ const Api = {
   getAllCheckins: () => apiRequest("/checkins"),
   createSite: (site) => apiRequest("/sites", { method: "POST", body: site }),
   updateSite: (id, patch) => apiRequest(`/sites/${id}`, { method: "PUT", body: patch }),
-
   checkIn: (payload) => apiRequest("/checkins", { method: "POST", body: payload }),
   myCheckins: () => apiRequest("/checkins/me"),
   allCheckins: (flaggedOnly) => apiRequest(`/checkins${flaggedOnly ? "?flagged=true" : ""}`),
   reviewCheckin: (id) => apiRequest(`/checkins/${id}/review`, { method: "PATCH" }),
-  exportCsv: (startDate, endDate) =>
-    apiRequest(`/checkins/export?startDate=${startDate}&endDate=${endDate}`, { isBlob: true }),
-
-  // Active users only by default; pass true to include deactivated
-  getUsers: (includeInactive = false) =>
-    apiRequest(`/users${includeInactive ? "?includeInactive=1" : ""}`),
+  exportCsv: (startDate, endDate) => apiRequest(`/checkins/export?startDate=${startDate}&endDate=${endDate}`, { isBlob: true }),
+  getUsers: (includeInactive = false) => apiRequest(`/users${includeInactive ? "?includeInactive=1" : ""}`),
   createUser: (user) => apiRequest("/users", { method: "POST", body: user }),
   approveDevice: (id) => apiRequest(`/users/${id}/approve-device`, { method: "POST" }),
   resetDevice: (id) => apiRequest(`/users/${id}/reset-device`, { method: "POST" }),
   forceLogout: (id) => apiRequest(`/users/${id}/force-logout`, { method: "POST" }),
-  resetPassword: (id, newPassword) =>
-    apiRequest(`/users/${id}/reset-password`, { method: "POST", body: { newPassword } }),
-
+  resetPassword: (id, newPassword) => apiRequest(`/users/${id}/reset-password`, { method: "POST", body: { newPassword } }),
   updateMyProfile: (patch) => apiRequest("/users/me", { method: "PATCH", body: patch }),
+  changeMyPassword: (currentPassword, newPassword) => apiRequest("/users/me/password", { method: "POST", body: { currentPassword, newPassword } }),
   deleteMyAccount: () => apiRequest("/users/me", { method: "DELETE" }),
-
   myAssignmentToday: () => apiRequest("/assignments/me/today"),
   mySchedule: () => apiRequest("/assignments/me"),
   getAssignments: (date) => apiRequest(`/assignments${date ? `?date=${date}` : ""}`),
   createAssignment: (a) => apiRequest("/assignments", { method: "POST", body: a }),
   updateAssignment: (id, patch) => apiRequest(`/assignments/${id}`, { method: "PATCH", body: patch }),
   deleteAssignment: (id) => apiRequest(`/assignments/${id}`, { method: "DELETE" }),
-
   submitReport: (payload) => apiRequest("/field/reports", { method: "POST", body: payload }),
   myReports: () => apiRequest("/field/reports/me"),
   allReports: (openOnly) => apiRequest(`/field/reports${openOnly ? "?open=true" : ""}`),
+  requestReport: (userId, title, message, siteId) => apiRequest("/field/reports/request", { method: "POST", body: { userId, title, message, siteId } }),
   reviewReport: (id) => apiRequest(`/field/reports/${id}/review`, { method: "PATCH" }),
-
   getSurveys: () => apiRequest("/field/surveys"),
-  answerSurvey: (id, answer) =>
-    apiRequest(`/field/surveys/${id}/answer`, { method: "POST", body: { answer } }),
+  answerSurvey: (id, answer) => apiRequest(`/field/surveys/${id}/answer`, { method: "POST", body: { answer } }),
   createSurvey: (payload) => apiRequest("/field/surveys", { method: "POST", body: payload }),
-
   getAnnouncements: () => apiRequest("/field/announcements"),
-  createAnnouncement: (payload) =>
-    apiRequest("/field/announcements", { method: "POST", body: payload }),
-
+  createAnnouncement: (payload) => apiRequest("/field/announcements", { method: "POST", body: payload }),
   getNotifications: () => apiRequest("/field/notifications"),
   markNotificationsRead: () => apiRequest("/field/notifications/read", { method: "POST" }),
-
   getActivity: () => apiRequest("/field/activity"),
 };
 
@@ -217,9 +169,8 @@ async function checkInWithOffline(payload) {
     await OfflineQueue.enqueue({ kind: "checkin", payload });
     return { offline: true, message: "Saved offline – will sync when online." };
   }
-  try {
-    return await Api.checkIn(payload);
-  } catch (err) {
+  try { return await Api.checkIn(payload); }
+  catch (err) {
     if (err.message.includes("Network error")) {
       await OfflineQueue.enqueue({ kind: "checkin", payload });
       return { offline: true, message: "Saved offline – will sync when online." };
@@ -233,9 +184,8 @@ async function submitReportWithOffline(payload) {
     await OfflineQueue.enqueue({ kind: "report", payload });
     return { offline: true, message: "Report saved offline – will sync when online." };
   }
-  try {
-    return await Api.submitReport(payload);
-  } catch (err) {
+  try { return await Api.submitReport(payload); }
+  catch (err) {
     if (err.message.includes("Network error")) {
       await OfflineQueue.enqueue({ kind: "report", payload });
       return { offline: true, message: "Report saved offline – will sync when online." };
@@ -253,9 +203,7 @@ async function flushOfflineQueue() {
       else if (item.kind === "report") await Api.submitReport(item.payload);
       await OfflineQueue.remove(item.id);
       synced++;
-    } catch {
-      // keep for next attempt
-    }
+    } catch (_) {}
   }
   return synced;
 }
@@ -263,9 +211,7 @@ async function flushOfflineQueue() {
 if (typeof window !== "undefined") {
   window.addEventListener("online", () => {
     flushOfflineQueue().then((n) => {
-      if (n > 0 && window.showToast) {
-        window.showToast(`${n} offline item(s) synced`, "success");
-      }
+      if (n > 0 && window.showToast) window.showToast(`${n} offline item(s) synced`, "success");
     });
   });
 }
