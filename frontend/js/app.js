@@ -19,6 +19,12 @@ function showScreen(id) {
   document.getElementById(id).classList.remove("hidden");
 }
 
+function escapeHtml(str) {
+  const d = document.createElement("div");
+  d.textContent = str == null ? "" : String(str);
+  return d.innerHTML;
+}
+
 // ---- App state ----
 const state = {
   sites: [],
@@ -161,7 +167,7 @@ async function updateOfflineBadge() {
   try {
     const n = await OfflineQueue.count();
     if (n > 0) {
-      el.textContent = `${n} offline`;
+      el.textContent = n + " offline";
       el.classList.remove("hidden");
     } else {
       el.classList.add("hidden");
@@ -174,7 +180,7 @@ async function updateOfflineBadge() {
 setInterval(updateOfflineBadge, 8000);
 window.addEventListener("online", () => {
   flushOfflineQueue().then((n) => {
-    if (n > 0) showToast(`${n} offline item(s) synced`, "success");
+    if (n > 0) showToast(n + " offline item(s) synced", "success");
     updateOfflineBadge();
   });
 });
@@ -187,7 +193,7 @@ function setupWorkerTabs() {
       state.workerTab = tab;
       document.querySelectorAll("[data-worker-tab]").forEach((b) => b.classList.toggle("active", b === btn));
       document.querySelectorAll(".worker-panel").forEach((p) => p.classList.add("hidden"));
-      document.getElementById(`panel-${tab}`)?.classList.remove("hidden");
+      document.getElementById("panel-" + tab)?.classList.remove("hidden");
 
       if (tab === "reports") loadMyReports();
       if (tab === "alerts") loadNotifications();
@@ -204,8 +210,8 @@ async function loadAttendanceSummary() {
       ? Math.round((summary.daysPresent / summary.daysInMonth) * 100)
       : 0;
     document.getElementById("attendance-days").textContent =
-      `${summary.daysPresent} / ${summary.daysInMonth} days`;
-    document.getElementById("attendance-bar-fill").style.width = `${pct}%`;
+      summary.daysPresent + " / " + summary.daysInMonth + " days";
+    document.getElementById("attendance-bar-fill").style.width = pct + "%";
     document.getElementById("attendance-month-label").textContent = summary.month;
   } catch {}
 }
@@ -227,7 +233,7 @@ function initMap() {
   L.tileLayer(
     "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
     {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      attribution: "OpenStreetMap / CARTO",
       maxZoom: 19,
       subdomains: "abcd",
     }
@@ -298,7 +304,7 @@ async function loadTodayAssignment() {
     if (select) select.value = String(assignments[0].site_id);
 
     banner.innerHTML = assignments
-      .map((a) => `<div><strong>${a.site_name}</strong>${a.task ? ` · ${a.task}` : ""}</div>`)
+      .map((a) => "<div><strong>" + escapeHtml(a.site_name) + "</strong>" + (a.task ? " · " + escapeHtml(a.task) : "") + "</div>")
       .join("");
     banner.classList.remove("hidden");
     updateDistanceDisplay();
@@ -342,15 +348,12 @@ async function loadHistory() {
       const li = document.createElement("li");
       li.className = "history-item";
       const time = new Date(item.created_at).toLocaleString();
-      li.innerHTML = `
-        <div>
-          <div>${item.type === "check_in" ? "Checked in" : "Checked out"}</div>
-          <div class="meta">${time} · ${Math.round(item.distance_meters)}m</div>
-        </div>
-        <span class="badge ${item.status === "inside" ? "badge-inside" : "badge-outside"}">
-          ${item.status}
-        </span>
-      `;
+      const typeLabel = item.type === "check_in" ? "Checked in" : "Checked out";
+      const badgeClass = item.status === "inside" ? "badge-inside" : "badge-outside";
+      li.innerHTML =
+        "<div><div>" + typeLabel + "</div>" +
+        "<div class=\"meta\">" + time + " · " + Math.round(item.distance_meters) + "m</div></div>" +
+        "<span class=\"badge " + badgeClass + "\">" + item.status + "</span>";
       list.appendChild(li);
     });
   } catch (err) {
@@ -435,9 +438,9 @@ function updateDistanceDisplay() {
   const inside = distance <= site.radius_meters;
 
   pill.textContent = inside
-    ? `Inside range · ${Math.round(distance)}m`
-    : `Outside range · ${Math.round(distance)}m`;
-  pill.className = `status-pill ${inside ? "status-inside" : "status-outside"}`;
+    ? "Inside range · " + Math.round(distance) + "m"
+    : "Outside range · " + Math.round(distance) + "m";
+  pill.className = "status-pill " + (inside ? "status-inside" : "status-outside");
 
   if (button) button.disabled = false;
 }
@@ -474,10 +477,11 @@ document.getElementById("checkin-button")?.addEventListener("click", async () =>
     }
 
     vibrate(result.flagged ? [200] : [100, 50, 100]);
+    const reason = (result.flag_reason || "").replace(/_/g, " ");
     showToast(
       result.flagged
-        ? `Recorded, but flagged for review (${(result.flag_reason || "").replace(/_/g, " ")}).`
-        : `${result.type === "check_in" ? "Checked in" : "Checked out"} successfully.`,
+        ? "Recorded, but flagged for review (" + reason + ")."
+        : (result.type === "check_in" ? "Checked in" : "Checked out") + " successfully.",
       result.flagged ? "error" : "success"
     );
 
@@ -507,16 +511,13 @@ async function loadMyReports() {
     rows.forEach((r) => {
       const li = document.createElement("li");
       li.className = "history-item";
-      li.innerHTML = `
-        <div>
-          <div><strong>${escapeHtml(r.title)}</strong></div>
-          <div class="meta">${new Date(r.created_at).toLocaleString()} · ${r.status}</div>
-        </div>
-      `;
+      li.innerHTML =
+        "<div><div><strong>" + escapeHtml(r.title) + "</strong></div>" +
+        "<div class=\"meta\">" + new Date(r.created_at).toLocaleString() + " · " + r.status + "</div></div>";
       list.appendChild(li);
     });
   } catch (err) {
-    list.innerHTML = `<li class='meta'>${escapeHtml(err.message)}</li>`;
+    list.innerHTML = "<li class='meta'>" + escapeHtml(err.message) + "</li>";
   }
 }
 
@@ -562,17 +563,14 @@ async function loadNotifications() {
     rows.forEach((n) => {
       const li = document.createElement("li");
       li.className = "history-item" + (n.read ? "" : " unread");
-      li.innerHTML = `
-        <div>
-          <div><strong>${escapeHtml(n.title)}</strong></div>
-          <div class="meta">${escapeHtml(n.body)}</div>
-          <div class="meta">${new Date(n.created_at).toLocaleString()}</div>
-        </div>
-      `;
+      li.innerHTML =
+        "<div><div><strong>" + escapeHtml(n.title) + "</strong></div>" +
+        "<div class=\"meta\">" + escapeHtml(n.body) + "</div>" +
+        "<div class=\"meta\">" + new Date(n.created_at).toLocaleString() + "</div></div>";
       list.appendChild(li);
     });
   } catch (err) {
-    list.innerHTML = `<li class='meta'>${escapeHtml(err.message)}</li>`;
+    list.innerHTML = "<li class='meta'>" + escapeHtml(err.message) + "</li>";
   }
 }
 
@@ -603,7 +601,7 @@ document.getElementById("save-profile-btn")?.addEventListener("click", async () 
   const locale = document.getElementById("profile-locale")?.value;
   try {
     const updated = await Api.updateMyProfile({ fullName, phone, locale });
-    Auth.setUser({ ...Auth.getUser(), ...updated, fullName: updated.full_name || fullName });
+    Auth.setUser(Object.assign({}, Auth.getUser(), updated, { fullName: updated.full_name || fullName }));
     if (typeof setLocale === "function") setLocale(locale);
     showToast("Profile saved", "success");
   } catch (err) {
@@ -621,11 +619,3 @@ document.getElementById("delete-account-btn")?.addEventListener("click", async (
     showToast(err.message, "error");
   }
 });
-
-function escapeHtml(str) {
-  return String(str ?? "")
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, """);
-}
