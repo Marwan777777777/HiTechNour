@@ -1,28 +1,28 @@
 :root{
-  --bg:#F6F8FC;
-  --panel:#FFFFFF;
-  --panel-alt:#FAFBFE;
-  --ink:#0F1A33;
-  --ink-dim:#5B6478;
-  --ink-faint:#94A0B8;
-  --line:#E7EBF3;
-  --line-strong:#D8DEEB;
-  --blue:#2557D6;
-  --blue-dark:#1B3FA6;
-  --blue-wash:#EAF0FE;
-  --blue-wash-strong:#DCE7FD;
-  --green:#16A34A;
-  --green-wash:#E7F7EE;
-  --amber:#D97706;
-  --amber-wash:#FDF3E3;
-  --red:#DC2626;
-  --red-wash:#FCEAEA;
-  --purple:#7C5CFC;
-  --purple-wash:#EFEBFF;
+  --bg:#0B1220;
+  --panel:#121A2B;
+  --panel-alt:#182234;
+  --ink:#E8EEF8;
+  --ink-dim:#8B9BB8;
+  --ink-faint:#5A6A85;
+  --line:#1E2A3F;
+  --line-strong:#2A3A55;
+  --blue:#3B82F6;
+  --blue-dark:#2563EB;
+  --blue-wash:#1A2744;
+  --blue-wash-strong:#243556;
+  --green:#22C55E;
+  --green-wash:#0F2A1C;
+  --amber:#F59E0B;
+  --amber-wash:#2A2110;
+  --red:#EF4444;
+  --red-wash:#2A1414;
+  --purple:#A78BFA;
+  --purple-wash:#1E1A2E;
   --radius:14px;
   --radius-sm:9px;
-  --shadow:0 1px 2px rgba(15,26,51,0.04), 0 8px 24px -12px rgba(15,26,51,0.10);
-  --shadow-lg:0 20px 60px -20px rgba(15,26,51,0.28);
+  --shadow:0 1px 2px rgba(0,0,0,0.25), 0 8px 24px -12px rgba(0,0,0,0.45);
+  --shadow-lg:0 20px 60px -20px rgba(0,0,0,0.65);
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
@@ -54,7 +54,7 @@ button{font-family:inherit;cursor:pointer;}
 .brand-mark{
   width:32px;height:32px;border-radius:9px;background:linear-gradient(145deg,var(--blue),var(--blue-dark));
   display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Space Grotesk';font-weight:700;font-size:16px;
-  box-shadow:0 4px 10px -3px rgba(37,87,214,0.55);
+  box-shadow:0 4px 10px -3px rgba(59,130,246,0.55);
 }
 .brand-name{font-family:'Space Grotesk';font-weight:700;font-size:15px;letter-spacing:0.2px;}
 .brand-sub{font-size:10px;color:var(--ink-faint);font-weight:500;letter-spacing:.4px;text-transform:uppercase;margin-top:1px;}
@@ -68,7 +68,7 @@ button{font-family:inherit;cursor:pointer;}
 }
 .nav-item svg{flex-shrink:0;}
 .nav-item:hover{background:var(--panel-alt);color:var(--ink);}
-.nav-item.active{background:var(--blue);color:#fff;box-shadow:0 6px 14px -6px rgba(37,87,214,0.55);}
+.nav-item.active{background:var(--blue);color:#fff;box-shadow:0 6px 14px -6px rgba(59,130,246,0.55);}
 .nav-item.active svg{stroke:#fff;}
 .nav-badge{
   margin-left:auto;background:var(--red);color:#fff;font-size:10.5px;font-weight:700;
@@ -92,7 +92,7 @@ button{font-family:inherit;cursor:pointer;}
 .topbar-title span{color:var(--ink-faint);font-size:13px;font-weight:500;}
 .topbar-right{display:flex;align-items:center;gap:14px;}
 .icon-btn{
-  width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--panel);
+  width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--panel-alt);
   display:flex;align-items:center;justify-content:center;position:relative;color:var(--ink-dim);
 }
 .icon-btn .dot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);border:1.5px solid var(--panel);}
@@ -151,7 +151,7 @@ tr.row-click:hover{background:var(--panel-alt);}
 
 /* ---------- WORKER DETAIL DRAWER ---------- */
 .drawer-overlay{
-  position:fixed;inset:0;background:rgba(15,20,35,0.42);z-index:50;
+  position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:50;
   display:none;align-items:stretch;justify-content:flex-end;
 }
 .drawer-overlay.open{display:flex;}
@@ -165,7 +165,7 @@ tr.row-click:hover{background:var(--panel-alt);}
   padding:22px 24px;background:var(--panel);border-bottom:1px solid var(--line);
   position:sticky;top:0;z-index:2;
 }
-.drawer-close{position:absolute;top:20px;right:20px;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--panel);display:flex;align-items:center;justify-content:center;color:var(--ink-dim);cursor:pointer;}
+.drawer-close{position:absolute;top:20px;right:20px;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--panel-alt);display:flex;align-items:center;justify-content:center;color:var(--ink-dim);cursor:pointer;}
 .drawer-profile{display:flex;gap:14px;align-items:center;}
 .avatar-lg{width:54px;height:54px;border-radius:14px;background:var(--blue-wash);color:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px;font-family:'Space Grotesk';flex-shrink:0;}
 .drawer-name{font-family:'Space Grotesk';font-size:18px;font-weight:700;}
@@ -220,7 +220,7 @@ tr.row-click:hover{background:var(--panel-alt);}
 .rate-field{display:flex;align-items:center;gap:8px;padding:12px 16px;background:var(--panel-alt);border-bottom:1px solid var(--line);}
 .rate-field input{
   border:1px solid var(--line-strong);border-radius:8px;padding:6px 10px;font-family:'JetBrains Mono';font-size:13px;
-  width:110px;outline:none;
+  width:110px;outline:none;background:var(--panel);color:var(--ink);
 }
 .rate-field input:focus{border-color:var(--blue);}
 .rate-field label{font-size:12.5px;font-weight:600;color:var(--ink-dim);}
@@ -228,7 +228,7 @@ tr.row-click:hover{background:var(--panel-alt);}
 /* ---------- CLASSIC-PANEL NOTE ---------- */
 .classic-note{
   background:var(--blue-wash);border:1px solid var(--blue-wash-strong);border-radius:10px;
-  padding:12px 14px;font-size:12.5px;color:var(--blue-dark);margin-bottom:14px;
+  padding:12px 14px;font-size:12.5px;color:var(--blue);margin-bottom:14px;
 }
 .classic-note a{font-weight:700;text-decoration:underline;}
 
@@ -249,6 +249,6 @@ tr.row-click:hover{background:var(--panel-alt);}
   .drawer{width:100vw;max-width:100vw;}
   .menu-btn{display:flex !important;}
 }
-.menu-btn{display:none;width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--panel);align-items:center;justify-content:center;color:var(--ink-dim);}
-.sidebar-scrim{display:none;position:fixed;inset:0;background:rgba(15,20,35,0.35);z-index:39;}
+.menu-btn{display:none;width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--panel-alt);align-items:center;justify-content:center;color:var(--ink-dim);}
+.sidebar-scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:39;}
 .sidebar-scrim.open{display:block;}
