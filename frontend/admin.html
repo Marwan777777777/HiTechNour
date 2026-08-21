@@ -201,6 +201,12 @@
 
       <!-- ============ TEAM PAGE ============ -->
       <div class="page" id="page-team">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+          <button id="openAddWorkerBtn" style="display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Add Worker
+          </button>
+        </div>
         <div id="teamBySite"><div class="empty-note">Loading team…</div></div>
       </div>
 
@@ -243,6 +249,41 @@
 </div>
 
 <!-- ================= WORKER DRAWER ================= -->
+<div class="drawer-overlay" id="addWorkerOverlay">
+  <div class="drawer" style="max-width:420px;">
+    <div class="drawer-head">
+      <div class="drawer-close" id="addWorkerCloseBtn">✕</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;color:var(--ink);">Add Worker</div>
+    </div>
+    <div class="drawer-body" style="padding:20px;">
+      <form id="addWorkerForm">
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Full name</label>
+        <input id="awFullName" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" placeholder="e.g. Ahmed Fathy" />
+
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Username</label>
+        <input id="awUsername" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;font-family:'JetBrains Mono',monospace;" placeholder="e.g. ahmed.f" />
+
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Temporary password</label>
+        <input id="awPassword" required type="text" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:4px;outline:none;font-family:'JetBrains Mono',monospace;" placeholder="min. 8 characters" />
+        <div style="font-size:11px;color:var(--ink-faint);margin-bottom:14px;">At least 8 characters. Share this with the worker directly — it isn't emailed automatically.</div>
+
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Phone (optional)</label>
+        <input id="awPhone" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" placeholder="01xxxxxxxxx" />
+
+        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Role</label>
+        <select id="awRole" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:18px;outline:none;background:#fff;">
+          <option value="employee" selected>Employee</option>
+          <option value="admin">Admin</option>
+        </select>
+
+        <div id="addWorkerError" class="hidden" style="background:var(--red-wash);color:var(--red);border-radius:var(--radius-sm);padding:10px 12px;font-size:12.5px;margin-bottom:14px;"></div>
+
+        <button type="submit" id="addWorkerSubmitBtn" style="width:100%;padding:12px 0;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Add Worker</button>
+      </form>
+    </div>
+  </div>
+</div>
+
 <div class="drawer-overlay" id="drawerOverlay">
   <div class="drawer">
     <div class="drawer-head">
