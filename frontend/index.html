@@ -6,9 +6,9 @@
 <title>HiTechNour Attendance</title>
 
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0B1220" />
-<link rel="icon" type="image/png" href="icons/logo.svg" id="favicon" />
-<link rel="apple-touch-icon" href="icons/logo.svg" id="apple-icon" />
+<meta name="theme-color" content="#07101F" />
+<link rel="icon" type="image/png" href="icons/logo-htn.png" id="favicon" />
+<link rel="apple-touch-icon" href="icons/logo-htn.png" id="apple-icon" />
 
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -21,13 +21,14 @@
 <link rel="stylesheet" href="css/styles.css" />
 <link rel="stylesheet" href="css/brand.css" />
 <link rel="stylesheet" href="css/login-refinement.css" />
+<link rel="stylesheet" href="css/modern-ui.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="js/assets.js"></script>
 </head>
 <body>
 
 <div id="boot-screen" class="boot-screen">
-  <img class="boot-logo-img" src="icons/logo.svg" alt="HiTechNour" />
+  <img class="boot-logo-img" src="icons/logo-htn.png" alt="HiTechNour" />
   <div class="boot-logo-text">HiTechNour</div>
   <div class="boot-sub">ATTENDANCE</div>
 </div>
@@ -39,7 +40,7 @@
       <div class="login-visual-glow"></div>
       <div class="login-visual-content">
         <div class="login-brand-lockup">
-          <img src="icons/logo.svg" alt="" />
+          <img src="icons/logo-htn.png" alt="" />
           <div>
             <strong>HiTechNour</strong>
             <span>Operations</span>
@@ -62,7 +63,7 @@
     <div class="login-panel">
       <div class="login-panel-top">
         <div class="login-mobile-brand">
-          <img src="icons/logo.svg" alt="HiTechNour" />
+          <img src="icons/logo-htn.png" alt="HiTechNour" />
           <span>HiTechNour</span>
         </div>
         <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
@@ -103,8 +104,12 @@
       </div>
 
       <div class="login-social-links" aria-label="HiTechNour social media">
-        <a class="social-link" href="https://www.facebook.com/HTNTechnologies/" target="_blank" rel="noopener noreferrer" aria-label="HiTechNour on Facebook">f</a>
-        <a class="social-link social-link-in" href="https://eg.linkedin.com/company/hitechnourtechnologies-htn" target="_blank" rel="noopener noreferrer" aria-label="HiTechNour on LinkedIn">in</a>
+        <a class="social-link" href="https://www.facebook.com/HTNTechnologies/" target="_blank" rel="noopener noreferrer" aria-label="HiTechNour on Facebook">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.6 1.7-1.6h1.7V3.8c-.3 0-1.3-.1-2.4-.1-2.4 0-4.1 1.5-4.1 4.2V10H7.7v3h2.7v8h3.1Z"/></svg>
+        </a>
+        <a class="social-link social-link-in" href="https://eg.linkedin.com/company/hitechnourtechnologies-htn" target="_blank" rel="noopener noreferrer" aria-label="HiTechNour on LinkedIn">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.1 8.1H3V21h3.1V8.1ZM4.5 3A1.9 1.9 0 1 0 4.5 6.8 1.9 1.9 0 0 0 4.5 3ZM21 13.6c0-3.9-2.1-5.7-4.9-5.7-2.3 0-3.3 1.3-3.9 2.1V8.1H9.1V21h3.1v-6.4c0-1.7.3-3.3 2.4-3.3 2 0 2 1.9 2 3.4V21H21v-7.4Z"/></svg>
+        </a>
       </div>
 
       <div class="login-footer">
@@ -120,7 +125,7 @@
   <section class="company-about-card">
     <button type="button" class="company-about-close" id="close-company-about" aria-label="Close">×</button>
     <div class="company-about-brand">
-      <img src="icons/logo.svg" alt="HiTechNour" />
+      <img src="icons/logo-htn.png" alt="HiTechNour" />
       <div>
         <strong>HiTechNour Technologies</strong>
         <span>Established 2005 · Cairo, Egypt</span>
@@ -139,7 +144,7 @@
 <div id="app-screen" class="screen hidden">
   <header class="topbar">
     <div class="topbar-brand">
-      <img src="icons/logo.svg" alt="HiTechNour" />
+      <img src="icons/logo-htn.png" alt="HiTechNour" />
       <span>HiTechNour</span>
     </div>
     <div class="topbar-user">
