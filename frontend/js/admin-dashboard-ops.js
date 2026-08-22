@@ -1,262 +1,392 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>HiTechNour — Admin</title>
-<link rel="icon" type="image/png" href="icons/icon-192.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/admin-dashboard.css" />
-<style>
-.lang-toggle{
-  background:var(--panel,#fff);border:1px solid var(--line-strong,#D8DEEB);color:var(--ink,#0F1A33);
-  border-radius:9px;min-width:36px;height:34px;padding:0 10px;font-family:'Space Grotesk',sans-serif;
-  font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+d.textContent = str == null ? "" : String(str);
+return d.innerHTML;
 }
-.lang-toggle:hover{border-color:var(--blue,#2557D6);color:var(--blue,#2557D6);}
-.drawer-overlay.open{display:flex;}
-.drawer-overlay{display:none;}
-.brand-mark-img{width:36px;height:36px;border-radius:9px;object-fit:contain;background:#fff;}
-.brand-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.02em;}
-</style>
-</head>
-<body>
+  const SKILL_COLORS = ["#2557D6","#7C5CFC","#16A34A","#D97706","#DC2626","#0891B2","#DB2777","#65A30D","#4F46E5","#EA580C"];
+  const SKILL_COLORS = ["#3B82F6","#A78BFA","#22C55E","#F59E0B","#EF4444","#06B6D4","#EC4899","#84CC16","#6366F1","#F97316"];
+function colorForSkill(name) {
+let h = 0;
+const s = String(name || "");
+for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+return SKILL_COLORS[h % SKILL_COLORS.length];
+}
 
-<div class="app">
+window.loadAnomaliesFull = async function () {
+const body = document.getElementById("anomaliesFullBody");
+if (!body) return;
+try {
+const all = await Api.allCheckins(true);
+const flagged = all.filter((c) => c.flagged && !c.reviewed);
+if (!flagged.length) {
+body.innerHTML = '<div class="empty-note">Nothing flagged right now.</div>';
+return;
+}
+body.innerHTML = flagged.map((i) => `
+       <div class="queue-item" style="align-items:center;">
+         <div class="queue-icon" style="background:var(--red-wash);color:var(--red);">
+           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/></svg>
+         </div>
+         <div style="flex:1;">
+           <div class="queue-title">${(i.flag_reason || "flagged").replace(/_/g, " ")}</div>
+           <div class="queue-sub">${escapeHtml(i.full_name)} · ${escapeHtml(i.site_name)}</div>
+         </div>
+         <div class="queue-time" style="margin-right:12px;">${new Date(i.created_at).toLocaleString()}</div>
+         <button class="secondary-button" style="margin:0;" data-review-id="${i.id}">Mark reviewed</button>
+       </div>`).join("");
+body.querySelectorAll("[data-review-id]").forEach((btn) => {
+btn.addEventListener("click", async () => {
+btn.disabled = true;
+try {
+await Api.reviewCheckin(btn.dataset.reviewId);
+toast("Marked as reviewed", "success");
+window.loadAnomaliesFull();
+if (typeof loadOverview === "function") loadOverview();
+} catch (err) {
+toast(err.message, "error");
+btn.disabled = false;
+}
+});
+});
+} catch (err) {
+body.innerHTML = `<div class="empty-note">${escapeHtml(err.message)}</div>`;
+}
+};
 
-  <div class="sidebar-scrim" id="sidebarScrim"></div>
-
-  <div class="sidebar" id="sidebar">
-    <div class="brand">
-      <img class="brand-mark-img" src="icons/logo-htn.png" alt="HTN" onerror="this.outerHTML='<div class=brand-mark>H</div>'" />
-      <div>
-        <div class="brand-name">HiTechNour</div>
-        <div class="brand-sub">Attendance</div>
-      </div>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-item active" data-page="overview">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-        Overview
-      </div>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Operations</div>
-      <div class="nav-item" data-page="attendance">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-        Attendance
-      </div>
-      <div class="nav-item" data-page="team">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Team
-      </div>
-      <div class="nav-item" data-page="sites">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
-        Sites
-      </div>
-      <div class="nav-item" data-page="leave">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9h18"/></svg>
-        Days Off
-      </div>
-      <div class="nav-item" data-page="skills">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 6.9L21 9l-5.5 4.6L17.4 21 12 17l-5.4 4 1.9-7.4L3 9l6.6-.1z"/></svg>
-        Skills
-      </div>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Analytics</div>
-      <div class="nav-item" data-page="anomalies">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
-        Anomalies
-        <span class="nav-badge hidden" id="anomaliesBadge">0</span>
-      </div>
-      <div class="nav-item" data-page="activityfeed">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        Activity Feed
-      </div>
-      <div class="nav-item" data-page="reports">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/></svg>
-        Reports
-      </div>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">System</div>
-      <div class="nav-item" data-page="devices">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
-        Devices
-      </div>
-      <div class="nav-item" data-page="settings">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Settings
-      </div>
-    </div>
-
-    <div class="sidebar-footer" id="logoutFooter" title="Sign out">
-      <div class="avatar-sm" id="footerAvatar">A</div>
-      <div>
-        <div class="footer-name" id="footerName">Admin</div>
-        <div class="footer-role">Sign out</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="main">
-    <div class="topbar">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <button class="menu-btn" id="menuBtn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-        </button>
-        <div class="topbar-title">
-          <h1 id="pageTitle">Overview</h1>
-          <span>·</span>
-          <span id="topbarDate"></span>
-        </div>
-      </div>
-      <div class="topbar-right" style="display:flex;align-items:center;gap:10px;">
-        <button type="button" class="lang-toggle" data-lang-toggle title="Switch language">ع</button>
-        <div class="icon-btn" id="refreshBtn" title="Refresh">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        </div>
-      </div>
-    </div>
-
-    <div class="content">
-      <div class="page active" id="page-overview">
-        <div class="kpi-row">
-          <div class="kpi-card"><div class="kpi-top"><div class="kpi-icon" style="background:var(--blue-wash);color:var(--blue);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div class="kpi-label">Total Workers</div></div><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-sub" id="kpiTotalSub">&nbsp;</div></div>
-          <div class="kpi-card"><div class="kpi-top"><div class="kpi-icon" style="background:var(--green-wash);color:var(--green);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div><div class="kpi-label">Present Today</div></div><div class="kpi-value" id="kpiPresent">—</div><div class="kpi-sub" id="kpiPresentSub">&nbsp;</div></div>
-          <div class="kpi-card"><div class="kpi-top"><div class="kpi-icon" style="background:var(--amber-wash);color:var(--amber);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><div class="kpi-label">Late</div></div><div class="kpi-value" id="kpiLate">—</div><div class="kpi-sub" id="kpiLateSub">&nbsp;</div></div>
-          <div class="kpi-card"><div class="kpi-top"><div class="kpi-icon" style="background:var(--red-wash);color:var(--red);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg></div><div class="kpi-label">Absent</div></div><div class="kpi-value" id="kpiAbsent">—</div><div class="kpi-sub" id="kpiAbsentSub">&nbsp;</div></div>
-        </div>
-        <div class="grid-2">
-          <div class="panel"><div class="panel-head"><h3>Attendance Overview — Last 6 Days</h3></div><div class="panel-body"><canvas id="attendanceChart" height="150"></canvas></div></div>
-          <div class="panel"><div class="panel-head"><h3>Attendance by Site — Today</h3></div><div class="panel-body" style="display:flex;gap:14px;align-items:center;"><canvas id="siteDonut" width="120" height="120" style="flex-shrink:0;"></canvas><div style="flex:1;" id="siteDonutLegend"></div></div></div>
-        </div>
-        <div class="grid-2">
-          <div class="panel"><div class="panel-head"><h3>Recent Attendance — Today</h3><span class="link-btn" onclick="showPage('team')">View all</span></div><div class="panel-body" style="padding:0 18px 8px;"><table id="recentAttendanceTable"><tr><th>Worker</th><th>Site</th><th>Check In</th><th>Check Out</th><th>Status</th></tr></table><div class="empty-note hidden" id="recentAttendanceEmpty">No check-ins yet today.</div></div></div>
-          <div class="panel"><div class="panel-head"><h3>Review Queue</h3><span class="link-btn" onclick="showPage('anomalies')">View all</span></div><div class="panel-body" id="reviewQueueBody"><div class="empty-note">Nothing flagged. Loading…</div></div></div>
-        </div>
-      </div>
-
-      <div class="page" id="page-team">
+  // RESTORED - full file continues via second push if truncated
+  console.warn('admin-dashboard-ops partial - will complete');
+  window.loadSitesPage = async function () {
+    const root = document.getElementById("sitesPageBody");
+    if (!root) return;
+    root.innerHTML = '<div class="empty-note">Loading sites…</div>';
+    try {
+      const sites = await Api.getSites();
+      root.innerHTML = `
         <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-          <button id="openAddWorkerBtn" style="display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">+ Add Worker</button>
+          <button id="addSiteBtn" style="padding:9px 16px;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-weight:700;font-size:13px;cursor:pointer;">+ Add Site</button>
         </div>
-        <div id="teamBySite"><div class="empty-note">Loading team…</div></div>
-      </div>
+        <div class="panel"><div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;">
+          <table><thead><tr><th>Name</th><th>Address</th><th>Lat / Lng</th><th>Radius</th><th></th></tr></thead>
+          <tbody>${sites.map((s) => `<tr>
+            <td><strong>${escapeHtml(s.name)}</strong></td>
+            <td>${escapeHtml(s.address || "—")}</td>
+            <td class="mono" style="font-size:11px;">${Number(s.lat).toFixed(5)}, ${Number(s.lng).toFixed(5)}</td>
+            <td class="mono">${s.radius_meters || 200}m</td>
+            <td style="white-space:nowrap;">
+              <button class="secondary-button" style="margin:0 6px 0 0;" data-edit-site='${JSON.stringify(s).replace(/'/g, "&#39;")}'>Edit</button>
+              <button class="secondary-button" style="margin:0;color:var(--red);" data-deactivate-site="${s.id}" data-name="${escapeHtml(s.name)}">Deactivate</button>
+            </td></tr>`).join("")}</tbody></table>
+        </div></div>`;
+      document.getElementById("addSiteBtn")?.addEventListener("click", () => openSiteModal(null));
+      root.querySelectorAll("[data-edit-site]").forEach((btn) => {
+        btn.addEventListener("click", () => { try { openSiteModal(JSON.parse(btn.getAttribute("data-edit-site"))); } catch (_) {} });
+      });
+      root.querySelectorAll("[data-deactivate-site]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm('Deactivate "' + btn.dataset.name + '"?')) return;
+          try { await Api.updateSite(btn.dataset.deactivateSite, { active: false }); toast("Site deactivated", "success"); loadSitesPage(); }
+          catch (err) { toast(err.message, "error"); }
+        });
+      });
+    } catch (err) {
+      root.innerHTML = `<div class="empty-note">${escapeHtml(err.message)}</div>`;
+    }
+  };
 
-      <div class="page" id="page-activityfeed">
-        <div class="panel"><div class="panel-head"><h3>Activity Feed — All Workers</h3><input id="feedSearch" placeholder="Filter by worker..." style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12.5px;width:180px;outline:none;" /></div><div class="panel-body" id="feedBody" style="padding-top:6px;"><div class="empty-note">Loading…</div></div></div>
-      </div>
+  function openSiteModal(site) {
+    const overlay = document.getElementById("siteModalOverlay");
+    if (!overlay) return;
+    document.getElementById("siteModalTitle").textContent = site ? "Edit Site" : "Add Site";
+    document.getElementById("siteName").value = site?.name || "";
+    document.getElementById("siteAddress").value = site?.address || "";
+    document.getElementById("siteLat").value = site?.lat ?? "";
+    document.getElementById("siteLng").value = site?.lng ?? "";
+    document.getElementById("siteRadius").value = site?.radius_meters || 200;
+    overlay.dataset.editId = site?.id || "";
+    document.getElementById("siteModalError").classList.add("hidden");
+    overlay.classList.add("open");
+  }
+  function closeSiteModal() { document.getElementById("siteModalOverlay")?.classList.remove("open"); }
+  document.getElementById("siteModalClose")?.addEventListener("click", closeSiteModal);
+  document.getElementById("siteModalOverlay")?.addEventListener("click", (e) => { if (e.target.id === "siteModalOverlay") closeSiteModal(); });
+  document.getElementById("siteModalForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById("siteModalError");
+    errEl.classList.add("hidden");
+    const payload = {
+      name: document.getElementById("siteName").value.trim(),
+      address: document.getElementById("siteAddress").value.trim() || undefined,
+      lat: Number(document.getElementById("siteLat").value),
+      lng: Number(document.getElementById("siteLng").value),
+      radiusMeters: Number(document.getElementById("siteRadius").value) || 200,
+    };
+    if (!payload.name || !Number.isFinite(payload.lat) || !Number.isFinite(payload.lng)) {
+      errEl.textContent = "Name, lat, and lng are required."; errEl.classList.remove("hidden"); return;
+    }
+    const editId = document.getElementById("siteModalOverlay").dataset.editId;
+    try {
+      if (editId) await Api.updateSite(editId, payload); else await Api.createSite(payload);
+      toast(editId ? "Site updated" : "Site created", "success"); closeSiteModal(); loadSitesPage();
+    } catch (err) { errEl.textContent = err.message; errEl.classList.remove("hidden"); }
+  });
 
-      <div class="page" id="page-attendance">
-        <div class="panel" style="margin-bottom:16px;"><div class="panel-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
-          <div><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">From</label><input type="date" id="attStart" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" /></div>
-          <div><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">To</label><input type="date" id="attEnd" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-family:'JetBrains Mono';font-size:13px;outline:none;" /></div>
-          <div><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Site</label><select id="attSiteFilter" style="border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;background:#fff;min-width:150px;"><option value="">All sites</option></select></div>
-          <div style="flex:1;min-width:160px;"><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Worker</label><input type="text" id="attSearch" placeholder="Search by name…" style="width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;" /></div>
-          <div><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label><button id="attFlaggedOnly" style="border:1px solid var(--line-strong);background:#fff;border-radius:8px;padding:9px 13px;font-size:12.5px;font-weight:600;color:var(--ink-dim);cursor:pointer;">Flagged only</button></div>
-          <div><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">&nbsp;</label><button id="attExportBtn" style="border:none;background:var(--blue);color:#fff;border-radius:8px;padding:9px 15px;font-size:12.5px;font-weight:700;cursor:pointer;">Download CSV</button></div>
-        </div></div>
-        <div class="panel"><div class="panel-head"><h3>Check-in / Check-out Log</h3><span id="attCount" style="font-size:11.5px;color:var(--ink-faint);font-weight:600;"></span></div><div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;"><table><thead><tr><th>Worker</th><th>Site</th><th>Type</th><th>Time</th><th>Distance</th><th>Status</th></tr></thead><tbody id="attTableBody"></tbody></table><div id="attEmpty" class="empty-note hidden">No check-ins match these filters.</div></div></div>
-      </div>
+  window.loadSkillsPage = async function () {
+    const root = document.getElementById("skillsPageBody");
+    if (!root) return;
+    root.innerHTML = '<div class="empty-note">Loading…</div>';
+    try {
+      const [skills, sites, users] = await Promise.all([Api.getSkills(), Api.getSites(), Api.getUsers(false)]);
+      const workers = users.filter((u) => u.role !== "admin");
+      const skillWorkerMaps = {};
+      await Promise.all(skills.map(async (s) => {
+        try { skillWorkerMaps[s.id] = await Api.getSkillWorkers(s.id); } catch { skillWorkerMaps[s.id] = []; }
+      }));
+      const skillsByUser = {};
+      workers.forEach((w) => (skillsByUser[w.id] = []));
+      skills.forEach((s) => {
+        (skillWorkerMaps[s.id] || []).forEach((row) => {
+          if (!skillsByUser[row.id]) skillsByUser[row.id] = [];
+          skillsByUser[row.id].push({ skillId: s.id, name: s.name, level: row.level });
+        });
+      });
+      const today = new Date().toISOString().slice(0, 10);
+      const selStyle = 'width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:8px;background:var(--panel);color:var(--ink);';
+      const inpStyle = 'border:1px solid var(--line-strong);border-radius:8px;padding:8px;background:var(--panel);color:var(--ink);';
 
-      <div class="page" id="page-sites"><div id="sitesPageBody"><div class="empty-note">Loading sites…</div></div></div>
-      <div class="page" id="page-leave"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Days-off / leave requests aren't tracked yet.</div></div></div>
-      <div class="page" id="page-skills"><div id="skillsPageBody"><div class="empty-note">Loading skills…</div></div></div>
-      <div class="page" id="page-anomalies"><div class="panel"><div class="panel-head"><h3>Flagged Check-ins Awaiting Review</h3></div><div class="panel-body" id="anomaliesFullBody"><div class="empty-note">Loading…</div></div></div></div>
-      <div class="page" id="page-reports"><div class="panel"><div class="panel-body"><div class="classic-note">Use Attendance → Download CSV for payroll export.</div></div></div></div>
-      <div class="page" id="page-devices">
-        <div class="panel" style="margin-bottom:16px;"><div class="panel-body" style="display:flex;gap:12px;align-items:center;"><input type="text" id="devSearch" placeholder="Search workers…" style="flex:1;border:1px solid var(--line-strong);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" /><span id="devPendingBadge" class="nav-badge hidden" style="position:static;"></span></div></div>
-        <div class="panel"><div class="panel-head"><h3>Device Bindings</h3></div><div class="panel-body" style="padding:0 18px 6px;overflow-x:auto;"><table><thead><tr><th>Worker</th><th>Status</th><th>Bound Since</th><th></th></tr></thead><tbody id="devTableBody"></tbody></table><div id="devEmpty" class="empty-note hidden">No workers match this search.</div></div></div>
-      </div>
-      <div class="page" id="page-settings"><div class="panel"><div class="panel-body" style="padding:40px;text-align:center;color:var(--ink-faint);">Settings coming next.</div></div></div>
-    </div>
-  </div>
-</div>
-
-<div class="drawer-overlay" id="siteModalOverlay">
-  <div class="drawer" style="max-width:420px;">
-    <div class="drawer-head"><div class="drawer-close" id="siteModalClose">✕</div><div id="siteModalTitle" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;">Add Site</div></div>
-    <div class="drawer-body" style="padding:20px;">
-      <form id="siteModalForm">
-        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Name</label>
-        <input id="siteName" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" />
-        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Address (optional)</label>
-        <input id="siteAddress" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" />
-        <div style="display:flex;gap:10px;">
-          <div style="flex:1;"><label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Latitude</label><input id="siteLat" required type="number" step="any" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" /></div>
-          <div style="flex:1;"><label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Longitude</label><input id="siteLng" required type="number" step="any" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" /></div>
+      root.innerHTML = `
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-head"><h3>Skill / role tags</h3></div>
+          <div class="panel-body">
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <input id="newSkillName" placeholder="e.g. software, hardware…" style="flex:1;${inpStyle}" />
+              <button id="addSkillBtn" style="border:none;background:var(--blue);color:#fff;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;">Add</button>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">${skills.map((s) => { const c = colorForSkill(s.name); return `<span style="background:${c}22;color:${c};border:1px solid ${c}44;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:700;">${escapeHtml(s.name)}</span>`; }).join("") || "—"}</div>
+          </div>
         </div>
-        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Geofence radius (meters)</label>
-        <input id="siteRadius" type="number" min="1" max="5000" value="200" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" />
-        <div id="siteModalError" class="hidden" style="background:var(--red-wash);color:var(--red);border-radius:var(--radius-sm);padding:10px 12px;font-size:12.5px;margin-bottom:14px;"></div>
-        <button type="submit" style="width:100%;padding:12px 0;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Save</button>
-      </form>
-    </div>
-  </div>
-</div>
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-head"><h3>Tag a worker</h3></div>
+          <div class="panel-body" style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
+            <div style="flex:1;min-width:140px;"><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Worker</label>
+              <select id="tagWorker" style="${selStyle}">${workers.map((u) => `<option value="${u.id}">${escapeHtml(u.full_name)}</option>`).join("")}</select></div>
+            <div style="flex:1;min-width:120px;"><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Skill</label>
+              <select id="tagSkill" style="${selStyle}">${skills.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("")}</select></div>
+            <div style="width:90px;"><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Level</label>
+              <input id="tagLevel" type="number" min="1" max="5" value="3" style="width:100%;${inpStyle}" /></div>
+            <button id="tagSkillBtn" style="border:none;background:var(--blue);color:#fff;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;">Save</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Staff a site for a day</h3></div>
+          <div class="panel-body">
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:16px;">
+              <div style="flex:1;min-width:160px;"><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Site</label>
+                <select id="staffSite" style="${selStyle}">${sites.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("")}</select></div>
+              <div style="width:150px;"><label style="font-size:11.5px;font-weight:600;color:var(--ink-dim);display:block;margin-bottom:6px;">Date</label>
+                <input id="staffDate" type="date" value="${today}" style="width:100%;${inpStyle}" /></div>
+              <button id="staffRefreshBtn" style="border:1px solid var(--line-strong);background:var(--panel);color:var(--ink);border-radius:8px;padding:9px 14px;font-weight:600;cursor:pointer;">Refresh</button>
+            </div>
+            <div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px;background:var(--panel-alt);">
+              <div style="font-size:12px;font-weight:700;color:var(--ink-dim);margin-bottom:10px;">What this site needs (skill + min level + count)</div>
+              <div id="needsRows"></div>
+              <button id="addNeedRow" type="button" style="margin-top:8px;border:1px dashed var(--line-strong);background:transparent;border-radius:8px;padding:7px 12px;font-size:12.5px;font-weight:600;color:var(--blue);cursor:pointer;">+ Add role need</button>
+              <button id="saveNeedsBtn" type="button" style="margin-top:8px;margin-left:8px;border:none;background:var(--blue);color:#fff;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer;">Save needs</button>
+            </div>
+            <div id="staffBoard"><div class="empty-note">Loading…</div></div>
+          </div>
+        </div>`;
 
-<div class="drawer-overlay" id="addWorkerOverlay">
-  <div class="drawer" style="max-width:420px;">
-    <div class="drawer-head"><div class="drawer-close" id="addWorkerCloseBtn">✕</div><div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;">Add Worker</div></div>
-    <div class="drawer-body" style="padding:20px;">
-      <form id="addWorkerForm">
-        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Full name</label>
-        <input id="awFullName" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" />
-        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Username</label>
-        <input id="awUsername" required style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;font-family:'JetBrains Mono',monospace;" />
-        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Temporary password</label>
-        <input id="awPassword" required type="text" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;font-family:'JetBrains Mono',monospace;" />
-        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Phone (optional)</label>
-        <input id="awPhone" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:14px;outline:none;" />
-        <label style="font-size:12px;color:var(--ink-dim);font-weight:600;display:block;margin-bottom:6px;">Role</label>
-        <select id="awRole" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:18px;outline:none;background:#fff;"><option value="employee" selected>Employee</option><option value="admin">Admin</option></select>
-        <div id="addWorkerError" class="hidden" style="background:var(--red-wash);color:var(--red);border-radius:var(--radius-sm);padding:10px 12px;font-size:12.5px;margin-bottom:14px;"></div>
-        <button type="submit" id="addWorkerSubmitBtn" style="width:100%;padding:12px 0;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Add Worker</button>
-      </form>
-    </div>
-  </div>
-</div>
+      document.getElementById("addSkillBtn")?.addEventListener("click", async () => {
+        const name = document.getElementById("newSkillName").value.trim();
+        if (!name) return;
+        try { await Api.createSkill(name); toast("Skill added", "success"); loadSkillsPage(); } catch (err) { toast(err.message, "error"); }
+      });
+      document.getElementById("tagSkillBtn")?.addEventListener("click", async () => {
+        try {
+          await Api.setWorkerSkill(document.getElementById("tagWorker").value, Number(document.getElementById("tagSkill").value), Number(document.getElementById("tagLevel").value) || 3);
+          toast("Saved", "success"); loadSkillsPage();
+        } catch (err) { toast(err.message, "error"); }
+      });
 
-<div class="drawer-overlay" id="drawerOverlay">
-  <div class="drawer">
-    <div class="drawer-head">
-      <div class="drawer-close" id="drawerCloseBtn">✕</div>
-      <div class="drawer-profile"><div class="avatar-lg" id="dwAvatar">—</div><div><div class="drawer-name" id="dwName">—</div><div class="drawer-role" id="dwRole"></div></div></div>
-      <div class="drawer-stats"><div><div class="dstat-val" id="dwAttendance">—</div><div class="dstat-label">Attendance</div></div><div><div class="dstat-val" id="dwDaysOff">—</div><div class="dstat-label">Days Off</div></div><div><div class="dstat-val" id="dwSites">—</div><div class="dstat-label">Sites</div></div></div>
-    </div>
-    <div class="tabs"><div class="tab active" data-tab="overview">Overview</div><div class="tab" data-tab="daysoff">Days Off</div><div class="tab" data-tab="sitelog">Site Log</div><div class="tab" data-tab="activity">Activity Log</div><div class="tab" data-tab="monthly">Monthly Report</div></div>
-    <div class="drawer-body">
-      <div class="tab-panel active" id="tab-overview"><div class="panel" style="margin-bottom:14px;"><div class="panel-head"><h3>Skills</h3></div><div class="panel-body" id="dwSkills"></div></div><div class="panel"><div class="panel-head"><h3>Contact</h3></div><div class="panel-body" style="font-size:13px;line-height:2;"><div>Phone: <span class="mono" id="dwPhone">—</span></div><div>Username: <span class="mono" id="dwUsername">—</span></div></div></div></div>
-      <div class="tab-panel" id="tab-daysoff"><div class="empty-note">Days-off tracking isn't built yet.</div></div>
-      <div class="tab-panel" id="tab-sitelog"></div>
-      <div class="tab-panel" id="tab-activity"></div>
-      <div class="tab-panel" id="tab-monthly"></div>
-    </div>
-  </div>
-</div>
+      let needs = [];
+      const needsEl = document.getElementById("needsRows");
 
-<div id="toast" class="toast hidden"></div>
-<style>.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:100;}.toast-error{background:var(--red);}.toast-success{background:var(--green);}.hidden{display:none !important;}</style>
+      function renderNeedsRows() {
+        needsEl.innerHTML = needs.map((n, idx) => `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
+          <select data-need-skill="${idx}" style="flex:1;min-width:120px;border:1px solid var(--line-strong);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);">
+            ${skills.map((s) => `<option value="${s.id}" ${Number(n.skillId) === s.id ? "selected" : ""}>${escapeHtml(s.name)}</option>`).join("")}
+          </select>
+          <label style="font-size:11px;color:var(--ink-dim);">min L<input data-need-level="${idx}" type="number" min="1" max="5" value="${n.minLevel || 1}" style="width:52px;margin-left:4px;border:1px solid var(--line-strong);border-radius:6px;padding:6px;background:var(--panel);color:var(--ink);" /></label>
+          <label style="font-size:11px;color:var(--ink-dim);">×<input data-need-count="${idx}" type="number" min="1" value="${n.count || 1}" style="width:52px;margin-left:4px;border:1px solid var(--line-strong);border-radius:6px;padding:6px;background:var(--panel);color:var(--ink);" /></label>
+          <button data-rm-need="${idx}" style="border:none;background:transparent;color:var(--red);font-weight:700;cursor:pointer;">✕</button>
+        </div>`).join("");
+        needsEl.querySelectorAll("[data-need-skill]").forEach((el) => el.addEventListener("change", () => { needs[Number(el.dataset.needSkill)].skillId = Number(el.value); renderStaffBoard(); }));
+        needsEl.querySelectorAll("[data-need-level]").forEach((el) => el.addEventListener("change", () => { needs[Number(el.dataset.needLevel)].minLevel = Number(el.value) || 1; renderStaffBoard(); }));
+        needsEl.querySelectorAll("[data-need-count]").forEach((el) => el.addEventListener("change", () => { needs[Number(el.dataset.needCount)].count = Number(el.value) || 1; renderStaffBoard(); }));
+        needsEl.querySelectorAll("[data-rm-need]").forEach((el) => el.addEventListener("click", () => { needs.splice(Number(el.dataset.rmNeed), 1); renderNeedsRows(); renderStaffBoard(); }));
+      }
 
-<script>
-  window.HTN_API_BASE_URL =
-    (location.hostname === "localhost" || location.hostname === "127.0.0.1")
-      ? "http://localhost:4000/api"
-      : "https://welcoming-blessing-production-6f01.up.railway.app/api";
-</script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
-<script src="js/api.js"></script>
-<script src="js/i18n.js"></script>
-<script src="js/notify.js"></script>
-<script src="js/admin-dashboard.js"></script>
-<script src="js/admin-dashboard-ops.js"></script>
-</body>
-</html>
-SEE_FILE
+      document.getElementById("addNeedRow")?.addEventListener("click", () => {
+        needs.push({ skillId: skills[0]?.id, minLevel: 1, count: 1 });
+        renderNeedsRows(); renderStaffBoard();
+      });
+      document.getElementById("saveNeedsBtn")?.addEventListener("click", async () => {
+        const siteId = document.getElementById("staffSite").value;
+        try {
+          const existing = await Api.getSiteRequirements(siteId);
+          for (const r of existing) await Api.removeSiteRequirement(siteId, r.skill_id);
+          for (const n of needs) if (n.skillId) await Api.setSiteRequirement(siteId, n.skillId, n.count || 1);
+          toast("Needs saved", "success");
+        } catch (err) { toast(err.message, "error"); }
+      });
+
+      async function loadExistingNeeds() {
+        const siteId = document.getElementById("staffSite").value;
+        try {
+          const rows = await Api.getSiteRequirements(siteId);
+          needs = rows.map((r) => ({ skillId: r.skill_id, minLevel: 1, count: r.workers_needed }));
+          if (!needs.length && skills[0]) needs = [{ skillId: skills[0].id, minLevel: 1, count: 1 }];
+        } catch {
+          needs = skills[0] ? [{ skillId: skills[0].id, minLevel: 1, count: 1 }] : [];
+        }
+        renderNeedsRows();
+        await renderStaffBoard();
+      }
+
+      async function renderStaffBoard() {
+        const board = document.getElementById("staffBoard");
+        const siteId = Number(document.getElementById("staffSite").value);
+        const date = document.getElementById("staffDate").value || today;
+        if (!board) return;
+        let assignments = [];
+        try { assignments = await Api.getAssignments(date); } catch { assignments = []; }
+        const assignedIds = new Set(assignments.filter((a) => Number(a.site_id) === siteId).map((a) => a.user_id));
+        const busyElsewhere = new Set(assignments.filter((a) => Number(a.site_id) !== siteId).map((a) => a.user_id));
+        if (!needs.length) { board.innerHTML = '<div class="empty-note">Add role needs above.</div>'; return; }
+
+        board.innerHTML = needs.map((n) => {
+          const skill = skills.find((s) => s.id === Number(n.skillId));
+          const skillName = skill?.name || "Skill";
+          const color = colorForSkill(skillName);
+          const minLevel = n.minLevel || 1;
+          const count = n.count || 1;
+          const matches = workers.filter((w) => (skillsByUser[w.id] || []).some((sk) => sk.skillId === Number(n.skillId) && sk.level >= minLevel));
+          const alreadyHere = matches.filter((w) => assignedIds.has(w.id));
+          const available = matches.filter((w) => !assignedIds.has(w.id) && !busyElsewhere.has(w.id));
+          const busy = matches.filter((w) => busyElsewhere.has(w.id));
+
+          function chip(w, action) {
+            const sk = (skillsByUser[w.id] || []).map((s) => {
+              const c = colorForSkill(s.name);
+              return `<span style="background:${c}22;color:${c};font-size:10px;padding:1px 6px;border-radius:999px;font-weight:700;margin-left:4px;">${escapeHtml(s.name)} L${s.level}</span>`;
+            }).join("");
+            return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;background:var(--panel);">
+              <div><strong>${escapeHtml(w.full_name)}</strong>${sk}</div>${action}</div>`;
+          }
+
+          return `<div style="border:1px solid ${color}33;border-radius:12px;padding:14px;margin-bottom:14px;background:var(--panel-alt);">
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+              <div style="font-weight:700;font-size:14px;color:${color};">${escapeHtml(skillName)} · need ${count} · min L${minLevel}</div>
+              <div style="font-size:12px;color:var(--ink-faint);">${alreadyHere.length}/${count} assigned</div>
+            </div>
+            ${alreadyHere.length ? `<div style="font-size:11.5px;font-weight:700;color:var(--ink-dim);margin-bottom:6px;">Assigned</div>` + alreadyHere.map((w) => {
+              const a = assignments.find((x) => x.user_id === w.id && Number(x.site_id) === siteId);
+              return chip(w, a ? `<button class="secondary-button" style="margin:0;color:var(--red);" data-unassign="${a.id}">Remove</button>` : "");
+            }).join("") : ""}
+            <div style="font-size:11.5px;font-weight:700;color:var(--ink-dim);margin:10px 0 6px;">Available (${available.length})</div>
+            ${available.length ? available.map((w) => chip(w, alreadyHere.length >= count ? `<span style="font-size:11px;color:var(--ink-faint);">full</span>` : `<button style="border:none;background:${color};color:#fff;border-radius:8px;padding:7px 12px;font-weight:700;font-size:12px;cursor:pointer;" data-assign="${w.id}" data-skill="${escapeHtml(skillName)}">Assign</button>`)).join("") : '<div class="empty-note" style="padding:8px 0;">No free workers match this skill/level.</div>'}
+            ${busy.length ? `<div style="font-size:11.5px;font-weight:700;color:var(--ink-dim);margin:10px 0 6px;">Busy elsewhere</div>` + busy.map((w) => chip(w, `<span style="font-size:11px;color:var(--amber);">elsewhere</span>`)).join("") : ""}
+          </div>`;
+        }).join("");
+
+        board.querySelectorAll("[data-assign]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            btn.disabled = true;
+            try {
+              await Api.createAssignment({ userId: Number(btn.dataset.assign), siteId, startDate: date, endDate: date, task: btn.dataset.skill || undefined });
+              toast("Assigned", "success"); await renderStaffBoard(); if (typeof state !== 'undefined') state.team = null;
+            } catch (err) { toast(err.message, "error"); btn.disabled = false; }
+          });
+        });
+        board.querySelectorAll("[data-unassign]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            if (!confirm("Remove assignment?")) return;
+            try { await Api.deleteAssignment(btn.dataset.unassign); toast("Removed", "success"); await renderStaffBoard(); if (typeof state !== 'undefined') state.team = null; }
+            catch (err) { toast(err.message, "error"); }
+          });
+        });
+      }
+
+      document.getElementById("staffSite")?.addEventListener("change", loadExistingNeeds);
+      document.getElementById("staffDate")?.addEventListener("change", renderStaffBoard);
+      document.getElementById("staffRefreshBtn")?.addEventListener("click", renderStaffBoard);
+      await loadExistingNeeds();
+    } catch (err) {
+      root.innerHTML = `<div class="empty-note">${escapeHtml(err.message)}</div>`;
+    }
+  };
+
+  window.injectWorkerActions = function (userId, user) {
+    const panel = document.getElementById("tab-overview");
+    if (!panel) return;
+    panel.querySelector("[data-worker-actions]")?.remove();
+    const box = document.createElement("div");
+    box.setAttribute("data-worker-actions", "1");
+    box.className = "panel";
+    box.style.marginTop = "14px";
+    box.innerHTML = `
+      <div class="panel-head"><h3>Admin actions</h3></div>
+      <div class="panel-body" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input id="editFullName" value="${escapeHtml(user.fullName || "")}" placeholder="Full name" style="flex:1;min-width:140px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel);color:var(--ink);" />
+          <input id="editPhone" value="${escapeHtml(user.phone || "")}" placeholder="Phone" style="flex:1;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel);color:var(--ink);" />
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="saveWorkerBtn" style="border:none;background:var(--blue);color:#fff;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;">Save</button>
+          <button id="deactivateWorkerBtn" style="border:1px solid var(--line-strong);background:var(--panel);color:var(--red);border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;">${user.active === false ? "Reactivate" : "Deactivate"}</button>
+          <button id="deleteWorkerBtn" style="border:1px solid var(--line-strong);background:var(--red-wash);color:var(--red);border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;">Delete forever</button>
+        </div>
+        <div style="font-size:11px;color:var(--ink-faint);">Deactivate hides from Team/Devices. Delete is permanent (for test duplicates).</div>
+      </div>`;
+    panel.appendChild(box);
+    document.getElementById("saveWorkerBtn")?.addEventListener("click", async () => {
+      try {
+        await Api.updateUser(userId, { fullName: document.getElementById("editFullName").value.trim(), phone: document.getElementById("editPhone").value.trim() });
+        toast("Updated", "success"); if (typeof state !== 'undefined') state.team = null;
+      } catch (err) { toast(err.message, "error"); }
+    });
+    document.getElementById("deactivateWorkerBtn")?.addEventListener("click", async () => {
+      const nextActive = user.active === false;
+      if (!nextActive && !confirm("Deactivate? They disappear from Team and can't log in.")) return;
+      try {
+        await Api.updateUser(userId, { active: nextActive });
+        toast(nextActive ? "Reactivated" : "Deactivated", "success");
+        if (typeof state !== 'undefined') state.team = null; if (typeof loadTeam === "function") loadTeam(); if (typeof closeDrawer === "function") closeDrawer();
+      } catch (err) { toast(err.message, "error"); }
+    });
+    document.getElementById("deleteWorkerBtn")?.addEventListener("click", async () => {
+      if (!confirm("Permanently DELETE this account?")) return;
+      if (!confirm("Really delete forever?")) return;
+      try {
+        await Api.deleteUser(userId);
+        toast("Deleted", "success");
+        if (typeof state !== 'undefined') state.team = null; if (typeof loadTeam === "function") loadTeam(); if (typeof closeDrawer === "function") closeDrawer();
+      } catch (err) { toast(err.message, "error"); }
+    });
+  };
+
+  const origOpen = window.openWorkerDrawer;
+  if (typeof origOpen === "function") {
+    window.openWorkerDrawer = async function (userId) {
+      await origOpen(userId);
+      try { const summary = await Api.workerSummary(userId); injectWorkerActions(userId, summary.user); } catch (_) {}
+    };
+  }
+  const origShow = window.showPage;
+  if (typeof origShow === "function") {
+    window.showPage = function (name) {
+      origShow(name);
+      if (name === "sites") loadSitesPage();
+      if (name === "skills") loadSkillsPage();
+      if (name === "anomalies") loadAnomaliesFull();
+    };
+  }
+})();
