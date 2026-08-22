@@ -1,0 +1,158 @@
+/* HiTechNour modern product surface — additive UI layer */
+:root{
+  --ui-bg:#07101f;
+  --ui-surface:rgba(15,25,43,.86);
+  --ui-surface-2:#101d31;
+  --ui-border:rgba(126,154,195,.16);
+  --ui-border-strong:rgba(126,154,195,.27);
+  --ui-text:#f4f7fb;
+  --ui-muted:#8b9ab2;
+  --ui-subtle:#61728d;
+  --ui-blue:#4b8df8;
+  --ui-blue-2:#2f73df;
+  --ui-green:#35c989;
+  --ui-red:#ef6262;
+  --ui-radius:18px;
+  --ui-shadow:0 24px 70px rgba(0,0,0,.30);
+}
+
+body{background:radial-gradient(900px 600px at 50% -120px,rgba(48,105,190,.16),transparent 65%),var(--ui-bg);}
+
+/* ---------- Login ---------- */
+#login-screen{padding:24px;overflow:auto;background:transparent;}
+#login-screen::before{opacity:.12;background-size:64px 64px;}
+.login-shell{width:min(1120px,100%);min-height:680px;border:1px solid var(--ui-border-strong);border-radius:26px;background:rgba(12,21,36,.94);box-shadow:0 40px 110px rgba(0,0,0,.48);backdrop-filter:blur(18px);}
+.login-visual{min-height:680px;padding:42px 48px;background:linear-gradient(145deg,#13243d 0%,#0b1729 58%,#08111f 100%);border-right:1px solid var(--ui-border);}
+.login-visual::after{width:520px;height:520px;right:-300px;bottom:-300px;border-color:rgba(93,151,241,.15);}
+.login-brand-lockup img{width:64px;height:64px;object-fit:contain;border:0;background:transparent;filter:drop-shadow(0 8px 20px rgba(50,130,245,.22));}
+.login-brand-lockup strong{font-size:20px;}
+.login-brand-lockup span{font-size:9px;letter-spacing:2.8px;color:#7d91ae;}
+.login-visual-copy{max-width:470px;margin:auto 0 48px;}
+.login-visual-copy .eyebrow,.login-kicker{font-size:10px;letter-spacing:2.8px;color:#75adff;}
+.login-visual-copy h2{font-size:48px;line-height:1.01;letter-spacing:-2.1px;margin:17px 0 18px;}
+.login-visual-copy p{max-width:420px;color:#91a2bc;font-size:14px;line-height:1.8;}
+.login-visual-points{gap:14px;}
+.login-visual-points span{font-size:12.5px;color:#b8c5d8;}
+.login-panel{padding:52px 64px 34px;background:rgba(15,26,44,.93);}
+.login-panel-top{margin-bottom:52px;}
+.login-panel-top .lang-toggle{width:38px;height:36px;border-radius:10px;background:#0b1627;border-color:var(--ui-border-strong);}
+.login-heading{margin-bottom:31px;}
+.login-heading h1{font-size:35px;letter-spacing:-1.2px;margin:12px 0 10px;}
+.login-heading p{font-size:13.5px;color:#788aa4;}
+.login-panel #login-form{gap:17px;}
+.login-panel #login-form label{font-size:11.5px;color:#9aaac0;}
+.login-panel #login-form input{min-height:52px;padding:13px 15px;border-radius:11px;background:#0a1526;border-color:#293a54;font-size:14px;}
+.login-panel #login-form input:focus{border-color:#4b8df8;box-shadow:0 0 0 4px rgba(75,141,248,.10);background:#0c182b;}
+.login-panel .password-wrap .icon-button{width:52px;height:52px;border-radius:11px;background:#0a1526;border-color:#293a54;font-size:0;}
+.login-panel .password-wrap .icon-button::before{content:'◉';font-size:14px;opacity:.7;}
+.login-panel .primary-button{min-height:53px;border-radius:11px;background:linear-gradient(135deg,#4b8df8,#3277df);box-shadow:0 16px 34px -16px rgba(57,126,239,.9);font-size:14px;}
+.login-panel .primary-button:hover{background:linear-gradient(135deg,#5a99ff,#3c83eb);}
+.login-company-links{margin-top:26px;justify-content:center;gap:9px 14px;}
+.company-link{font-size:10.5px;color:#7c8da6;}
+.company-link-about{color:#aab9cc;}
+.login-social-links{justify-content:center;margin-top:15px;gap:9px;}
+.social-link{width:34px;height:34px;border-radius:10px;background:#0a1526;border-color:#293a54;color:#8798b1;}
+.social-link:hover{background:#112139;border-color:#426993;color:#e3edf9;transform:translateY(-2px);}
+.social-link svg{width:15px;height:15px;fill:currentColor;}
+.login-footer{margin-top:24px;padding-top:19px;color:#556680;border-color:#1d2c42;}
+
+/* ---------- Main app shell ---------- */
+#app-screen{background:radial-gradient(700px 500px at 90% 0,rgba(47,115,223,.10),transparent 65%),var(--ui-bg);}
+#app-screen .topbar{height:70px;padding:0 clamp(18px,4vw,42px);background:rgba(9,17,31,.84);border-bottom:1px solid var(--ui-border);backdrop-filter:blur(18px);}
+#app-screen .topbar-brand{gap:12px;}
+#app-screen .topbar-brand img{width:42px;height:42px;object-fit:contain;border-radius:11px;filter:drop-shadow(0 5px 14px rgba(59,130,246,.20));}
+#app-screen .topbar-brand span{font-size:17px;letter-spacing:-.25px;color:#f5f8fc;}
+#app-screen .topbar-user{gap:9px;}
+#app-screen .topbar-user #user-name{padding:0 4px;color:#b9c6d8;font-size:12px;}
+#app-screen .topbar-user .lang-toggle{height:36px;border-radius:10px;background:#0c1829;border-color:var(--ui-border-strong);}
+#app-screen .topbar-user .icon-button{width:36px;height:36px;border-radius:10px;background:#0c1829;border-color:var(--ui-border);}
+#app-screen .topbar-user .icon-button:hover{border-color:rgba(239,98,98,.55);color:#ff8585;}
+
+#app-screen .worker-tabs{top:70px;gap:5px;padding:8px clamp(12px,4vw,42px);background:rgba(9,17,31,.74);border-bottom:1px solid var(--ui-border);backdrop-filter:blur(18px);}
+#app-screen .worker-tabs .tab-button{flex:0 1 130px;border:1px solid transparent;border-radius:11px;padding:10px 16px;color:#71829c;font-size:11px;letter-spacing:.4px;text-transform:none;transition:.18s ease;}
+#app-screen .worker-tabs .tab-button:hover{color:#c6d3e4;background:rgba(255,255,255,.035);}
+#app-screen .worker-tabs .tab-button.active{color:#eef5ff;background:rgba(75,141,248,.12);border-color:rgba(75,141,248,.20);box-shadow:inset 0 0 0 1px rgba(75,141,248,.04);}
+
+#app-screen .main-content{max-width:980px;padding:30px 22px 56px;}
+#app-screen .worker-panel{animation:uiFade .24s ease both;}
+@keyframes uiFade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+#app-screen .banner{border-radius:14px;padding:13px 16px;margin-bottom:16px;box-shadow:none;}
+#app-screen .map-wrap{margin-bottom:20px;position:relative;}
+#app-screen .site-map{height:330px;border-radius:20px;border:1px solid var(--ui-border-strong);box-shadow:var(--ui-shadow);background:#0d192a;}
+#app-screen .status-pill{position:absolute;left:16px;bottom:16px;margin:0;padding:9px 13px;border-radius:999px;background:rgba(7,16,31,.86);border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(12px);font-size:11px;box-shadow:0 8px 24px rgba(0,0,0,.22);}
+#app-screen .site-select-wrap{margin-bottom:18px;padding:16px;border:1px solid var(--ui-border);border-radius:16px;background:rgba(15,25,43,.66);}
+#app-screen .site-select-wrap label{margin-bottom:8px;color:#8798b0;font-size:10px;letter-spacing:1px;text-transform:uppercase;}
+#app-screen #site-select{min-height:50px;border-radius:11px;background-color:#0b1728;border-color:#293a54;font-size:14px;}
+#app-screen #checkin-button{min-height:56px;margin-bottom:24px;border-radius:13px;font-size:14px;box-shadow:0 18px 35px -18px rgba(59,130,246,.85);}
+#app-screen #checkin-button.checked-in{background:linear-gradient(135deg,#e96565,#d94c4c);}
+
+#app-screen .attendance-summary{padding:21px 22px;margin-bottom:26px;border-radius:18px;background:linear-gradient(145deg,rgba(17,30,51,.94),rgba(12,22,38,.94));border-color:var(--ui-border);box-shadow:var(--ui-shadow);}
+#app-screen .attendance-summary-head{margin-bottom:14px;}
+#app-screen .attendance-summary-head h2,#app-screen .history h2{font-size:10px;letter-spacing:1.3px;color:#7f91aa;}
+#app-screen #attendance-days{font-size:31px;letter-spacing:-1px;}
+#app-screen .attendance-bar{height:8px;background:#17253a;}
+#app-screen .attendance-bar-fill{background:linear-gradient(90deg,#3d80ec,#5ba3ff);}
+#app-screen .history-list{gap:10px;}
+#app-screen .history-item{padding:14px 16px;border:1px solid var(--ui-border);border-left:3px solid #263952;border-radius:13px;background:rgba(15,25,43,.76);box-shadow:none;}
+#app-screen .history-item:hover{border-color:var(--ui-border-strong);background:rgba(18,31,51,.92);}
+#app-screen .badge{padding:5px 9px;border-radius:999px;font-size:9px;letter-spacing:.4px;}
+
+#app-screen .worker-panel>h2{font-size:26px;letter-spacing:-.7px;margin:4px 0 22px;}
+#app-screen .worker-panel label{font-size:11px;color:#8b9bb2;margin-bottom:16px;}
+#app-screen .worker-panel input,#app-screen .worker-panel textarea,#app-screen .worker-panel select{min-height:50px;margin-top:7px;padding:12px 14px;border-radius:11px;background:#0b1728;border-color:#293a54;color:#f2f6fb;}
+#app-screen .worker-panel textarea{min-height:120px;}
+#app-screen .worker-panel input:focus,#app-screen .worker-panel textarea:focus,#app-screen .worker-panel select:focus{outline:none;border-color:#4b8df8;box-shadow:0 0 0 4px rgba(75,141,248,.09);}
+#app-screen .worker-panel>.primary-button{min-height:50px;border-radius:11px;}
+#app-screen .secondary-button{border-radius:10px;background:#0c1829;border-color:#293a54;color:#91a2b9;}
+#app-screen .secondary-button:hover{border-color:#4b8df8;color:#d7e7ff;background:#101f34;}
+
+/* Desktop home gets a deliberate two-column information rhythm. */
+@media(min-width:860px){
+  #app-screen .main-content{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:18px;align-items:start;}
+  #app-screen #panel-home{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  #app-screen #panel-home .banner,#app-screen #panel-home .map-wrap,#app-screen #panel-home .site-select-wrap,#app-screen #panel-home #checkin-button{grid-column:1/-1;}
+  #app-screen #panel-home .attendance-summary,#app-screen #panel-home .history{margin:0;}
+  #app-screen #panel-home .map-wrap{margin-bottom:0;}
+  #app-screen #panel-home .site-select-wrap{margin-bottom:0;}
+  #app-screen #panel-home #checkin-button{margin-bottom:0;}
+}
+
+/* ---------- RTL ---------- */
+html[dir="rtl"] #app-screen .topbar-brand,html[dir="rtl"] .login-brand-lockup{flex-direction:row-reverse;}
+html[dir="rtl"] #app-screen .topbar-user{flex-direction:row-reverse;}
+html[dir="rtl"] #app-screen .status-pill{left:auto;right:16px;}
+html[dir="rtl"] .login-panel{text-align:right;}
+html[dir="rtl"] .login-heading p,html[dir="rtl"] .login-visual-copy p{direction:rtl;}
+html[dir="rtl"] .login-company-links,html[dir="rtl"] .login-social-links{direction:ltr;}
+html[dir="rtl"] #app-screen .worker-tabs{direction:rtl;}
+
+@media(max-width:859px){
+  #app-screen .main-content{max-width:680px;}
+}
+@media(max-width:700px){
+  #login-screen{padding:0;}
+  .login-shell{min-height:100dvh;border-radius:0;border:0;box-shadow:none;}
+  .login-panel{min-height:100dvh;padding:24px 22px max(24px,env(safe-area-inset-bottom));}
+  .login-panel-top{margin-bottom:54px;}
+  #app-screen .topbar{height:64px;padding:0 16px;}
+  #app-screen .topbar-brand img{width:36px;height:36px;}
+  #app-screen .topbar-brand span{font-size:15px;}
+  #app-screen .topbar-user #user-name{display:none;}
+  #app-screen .worker-tabs{top:64px;padding:7px 10px;overflow-x:auto;}
+  #app-screen .worker-tabs .tab-button{flex:1 0 92px;padding:10px 9px;}
+  #app-screen .main-content{padding:20px 14px 40px;}
+  #app-screen .site-map{height:270px;border-radius:17px;}
+  #app-screen .attendance-summary{padding:18px;margin-bottom:22px;}
+}
+@media(max-width:480px){
+  .login-visual{display:none;}
+  .login-heading h1{font-size:29px;}
+  .login-panel-top{margin-bottom:52px;}
+  #app-screen .topbar{height:60px;}
+  #app-screen .worker-tabs{top:60px;}
+  #app-screen .main-content{padding:16px 12px 34px;}
+  #app-screen .site-map{height:235px;}
+  #app-screen .status-pill{left:12px;bottom:12px;}
+  html[dir="rtl"] #app-screen .status-pill{left:auto;right:12px;}
+}
+@media(prefers-reduced-motion:reduce){#app-screen .worker-panel{animation:none}.social-link{transition:none}}
