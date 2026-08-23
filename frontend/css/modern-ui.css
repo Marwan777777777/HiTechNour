@@ -24,6 +24,57 @@ body{background:radial-gradient(900px 600px at 50% -120px,rgba(48,105,190,.16),t
 .login-shell{width:min(1120px,100%);min-height:680px;border:1px solid var(--ui-border-strong);border-radius:26px;background:rgba(12,21,36,.94);box-shadow:0 40px 110px rgba(0,0,0,.48);backdrop-filter:blur(18px);}
 .login-visual{min-height:680px;padding:42px 48px;background:linear-gradient(145deg,#13243d 0%,#0b1729 58%,#08111f 100%);border-right:1px solid var(--ui-border);}
 .login-visual::after{width:520px;height:520px;right:-300px;bottom:-300px;border-color:rgba(93,151,241,.15);}
+
+/* Drifting light-streak background — subtle motion so the panel feels alive, not static */
+.login-visual::before{
+  content:"";
+  position:absolute;
+  inset:-20%;
+  z-index:0;
+  pointer-events:none;
+  background:
+    repeating-linear-gradient(
+      115deg,
+      transparent 0 46px,
+      rgba(126,166,217,.05) 46px 47px,
+      transparent 47px 96px
+    ),
+    repeating-linear-gradient(
+      115deg,
+      transparent 0 110px,
+      rgba(94,169,255,.045) 110px 112px,
+      transparent 112px 230px
+    );
+  background-size:600px 600px, 900px 900px;
+  animation:htnDrift 22s linear infinite;
+  will-change:background-position;
+}
+@keyframes htnDrift{
+  from{background-position:0 0, 0 0;}
+  to{background-position:600px -300px, -900px 450px;}
+}
+/* right-panel gets a faint echo of the same motion so it doesn't feel flat vs the left side */
+.login-panel{position:relative;overflow:hidden;}
+.login-panel::before{
+  content:"";
+  position:absolute;
+  inset:-20%;
+  z-index:0;
+  pointer-events:none;
+  background:repeating-linear-gradient(
+    115deg,
+    transparent 0 60px,
+    rgba(94,169,255,.03) 60px 61px,
+    transparent 61px 140px
+  );
+  background-size:700px 700px;
+  animation:htnDrift 26s linear infinite reverse;
+}
+.login-panel>*{position:relative;z-index:1;}
+
+@media(prefers-reduced-motion:reduce){
+  .login-visual::before,.login-panel::before{animation:none;}
+}
 .login-brand-lockup img{width:64px;height:64px;object-fit:contain;border:0;background:transparent;filter:drop-shadow(0 8px 20px rgba(50,130,245,.22));}
 .login-brand-lockup strong{font-size:20px;}
 .login-brand-lockup span{font-size:9px;letter-spacing:2.8px;color:#7d91ae;}
