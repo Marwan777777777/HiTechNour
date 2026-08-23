@@ -109,7 +109,7 @@ body{background:radial-gradient(900px 600px at 50% -120px,rgba(48,105,190,.16),t
 
 /* ---------- Main app shell ---------- */
 #app-screen{background:radial-gradient(700px 500px at 90% 0,rgba(47,115,223,.10),transparent 65%),var(--ui-bg);}
-#app-screen .topbar{height:70px;padding:0 clamp(18px,4vw,42px);background:rgba(9,17,31,.84);border-bottom:1px solid var(--ui-border);backdrop-filter:blur(18px);}
+#app-screen .topbar{height:70px;padding:0 clamp(18px,4vw,42px);background:rgba(9,17,31,.84);border-bottom:1px solid var(--ui-border);backdrop-filter:blur(18px);padding-top:env(safe-area-inset-top, 0px);height:calc(70px + env(safe-area-inset-top, 0px));}
 #app-screen .topbar-brand{gap:12px;}
 #app-screen .topbar-brand img{width:42px;height:42px;object-fit:contain;border-radius:11px;filter:drop-shadow(0 5px 14px rgba(59,130,246,.20));}
 #app-screen .topbar-brand span{font-size:17px;letter-spacing:-.25px;color:#f5f8fc;}
@@ -185,7 +185,7 @@ html[dir="rtl"] #app-screen .worker-tabs{direction:rtl;}
   .login-shell{min-height:100dvh;border-radius:0;border:0;box-shadow:none;}
   .login-panel{min-height:100dvh;padding:24px 22px max(24px,env(safe-area-inset-bottom));}
   .login-panel-top{margin-bottom:54px;}
-  #app-screen .topbar{height:64px;padding:0 16px;}
+  #app-screen .topbar{height:64px;padding:0 16px;padding-top:env(safe-area-inset-top, 0px);height:calc(64px + env(safe-area-inset-top, 0px));}
   #app-screen .topbar-brand img{width:36px;height:36px;}
   #app-screen .topbar-brand span{font-size:15px;}
   #app-screen .topbar-user #user-name{display:none;}
@@ -223,6 +223,7 @@ html[dir="rtl"] #app-screen .worker-tabs{direction:rtl;}
   pointer-events:none;
 }
 .hn-mark{width:46px;height:29px;filter:drop-shadow(0 0 10px rgba(94,169,255,.55));}
+@media(max-width:760px){.hn-mark{width:52px;height:33px;}}
 .login-top-brand-text strong{
   display:block; text-align:center;
   font-family:'Space Grotesk',Inter,sans-serif;
@@ -255,10 +256,10 @@ html[dir="rtl"] .login-top-lang{right:auto; left:26px;}
 }
 
 @media(max-width:760px){
-  .login-shell{padding-top:110px;}
-  .login-top-brand{top:30px;}
-  .login-top-lang{top:30px; right:18px;}
-  html[dir="rtl"] .login-top-lang{right:auto; left:18px;}
+  .login-shell{padding-top:calc(env(safe-area-inset-top, 0px) + 74px);}
+  .login-top-brand{top:calc(env(safe-area-inset-top, 0px) + 18px);}
+  .login-top-lang{top:calc(env(safe-area-inset-top, 0px) + 18px); right:16px;}
+  html[dir="rtl"] .login-top-lang{right:auto; left:16px;}
   .login-heading{margin-top:0;}
 }
 
