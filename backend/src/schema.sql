@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS checkins (
   user_id          INTEGER NOT NULL REFERENCES users(id),
   site_id          INTEGER NOT NULL REFERENCES sites(id),
   type             TEXT NOT NULL CHECK (type IN ('check_in', 'check_out')) DEFAULT 'check_in',
+  client_event_id  UUID NOT NULL,
   lat              DOUBLE PRECISION NOT NULL,
   lng              DOUBLE PRECISION NOT NULL,
   accuracy_meters  DOUBLE PRECISION,
@@ -47,6 +48,8 @@ CREATE TABLE IF NOT EXISTS checkins (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_checkins_user_client_event
+  ON checkins (user_id, client_event_id);
 CREATE INDEX IF NOT EXISTS idx_checkins_user_time ON checkins (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_checkins_user_type_time ON checkins (user_id, type, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_checkins_flagged ON checkins (flagged) WHERE flagged = true;
@@ -67,20 +70,14 @@ CREATE TABLE IF NOT EXISTS assignments (
   CHECK (end_date >= start_date)
 );
 
--- Powers "what's my assignment today" (worker) and "who's at this site
--- this week" (admin) without scanning the whole table.
 CREATE INDEX IF NOT EXISTS idx_assignments_user_dates ON assignments (user_id, start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_assignments_site_dates ON assignments (site_id, start_date, end_date);
 
--- Skill tags (e.g. "Software", "Gates / Access Control", "HVAC Technician")
--- that admins define once and reuse across workers and site requirements.
 CREATE TABLE IF NOT EXISTS skills (
   id    SERIAL PRIMARY KEY,
   name  TEXT UNIQUE NOT NULL
 );
 
--- Which skills a worker has, and how good they are at each (1-5). A worker
--- can have several skills; a skill can belong to many workers.
 CREATE TABLE IF NOT EXISTS worker_skills (
   user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   skill_id  INTEGER NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
@@ -89,9 +86,6 @@ CREATE TABLE IF NOT EXISTS worker_skills (
   PRIMARY KEY (user_id, skill_id)
 );
 
--- What a site needs, e.g. CBD needs 3 workers with "Software" and 2 with
--- "Gates Technician". Lets the admin click a site, see what's required,
--- then click a required skill to see which workers fit.
 CREATE TABLE IF NOT EXISTS site_skill_requirements (
   site_id         INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
   skill_id        INTEGER NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
@@ -99,7 +93,6 @@ CREATE TABLE IF NOT EXISTS site_skill_requirements (
   PRIMARY KEY (site_id, skill_id)
 );
 
--- Field reports submitted by workers ("what happened on site").
 CREATE TABLE IF NOT EXISTS reports (
   id          SERIAL PRIMARY KEY,
   user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -115,7 +108,6 @@ CREATE TABLE IF NOT EXISTS reports (
 CREATE INDEX IF NOT EXISTS idx_reports_user ON reports (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status, created_at DESC);
 
--- Admin-created surveys (e.g. daily safety check).
 CREATE TABLE IF NOT EXISTS surveys (
   id          SERIAL PRIMARY KEY,
   title       TEXT NOT NULL,
@@ -134,7 +126,6 @@ CREATE TABLE IF NOT EXISTS survey_answers (
   UNIQUE (survey_id, user_id)
 );
 
--- Company-wide announcements.
 CREATE TABLE IF NOT EXISTS announcements (
   id          SERIAL PRIMARY KEY,
   title       TEXT NOT NULL,
@@ -143,7 +134,6 @@ CREATE TABLE IF NOT EXISTS announcements (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Per-user in-app notifications.
 CREATE TABLE IF NOT EXISTS notifications (
   id          SERIAL PRIMARY KEY,
   user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -156,7 +146,6 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, created_at DESC);
 
--- Lightweight audit / activity log (app open, check-in, device approve, etc.).
 CREATE TABLE IF NOT EXISTS activity_logs (
   id          SERIAL PRIMARY KEY,
   user_id     INTEGER NOT NULL,
