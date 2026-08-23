@@ -10,6 +10,16 @@ function getDeviceId() {
   return id;
 }
 
+function getClientEventId() {
+  if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 const Auth = {
   getToken: () => localStorage.getItem("htn_token"),
   setToken: (token) => localStorage.setItem("htn_token", token),
@@ -29,12 +39,13 @@ const Auth = {
 const OfflineQueue = (() => {
   const DB_NAME = "htn_offline";
   const STORE = "queue";
+  const VERSION = 2;
   let dbPromise = null;
 
   function open() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1);
+      const req = indexedDB.open(DB_NAME, VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(STORE)) {
@@ -51,7 +62,11 @@ const OfflineQueue = (() => {
     const db = await open();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).add({ ...item, created: Date.now() });
+      tx.objectStore(STORE).add({
+        ...item,
+        ownerUserId: item.ownerUserId ?? Auth.getUser()?.id ?? null,
+        created: Date.now(),
+      });
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -77,12 +92,23 @@ const OfflineQueue = (() => {
     });
   }
 
-  async function count() {
+  async function countForCurrentUser() {
+    const userId = Auth.getUser()?.id;
+    if (!userId) return 0;
     const items = await list();
-    return items.length;
+    return items.filter((item) => item.ownerUserId === userId).length;
   }
 
-  return { enqueue, list, remove, count };
+  async function hasPendingCheckin(type) {
+    const userId = Auth.getUser()?.id;
+    if (!userId) return false;
+    const items = await list();
+    return items.some(
+      (item) => item.ownerUserId === userId && item.kind === "checkin" && item.payload?.type === type
+    );
+  }
+
+  return { enqueue, list, remove, countForCurrentUser, hasPendingCheckin };
 })();
 
 async function apiRequest(path, { method = "GET", body, isBlob = false } = {}) {
@@ -122,7 +148,10 @@ async function apiRequest(path, { method = "GET", body, isBlob = false } = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(data?.error || `Request failed (${response.status}).`);
+    const error = new Error(data?.error || `Request failed (${response.status}).`);
+    error.status = response.status;
+    error.code = data?.code;
+    throw error;
   }
   return data;
 }
@@ -153,8 +182,7 @@ const Api = {
       method: "POST",
       body: { skillId, workersNeeded },
     }),
-  removeSiteRequirement: (siteId, skillId) =>
-    apiRequest(`/skills/sites/${siteId}/${skillId}`, { method: "DELETE" }),
+  removeSiteRequirement: (siteId, skillId) => apiRequest(`/skills/sites/${siteId}/${skillId}`, { method: "DELETE" }),
 
   getOverview: () => apiRequest("/reports/overview"),
   getTeamBySite: () => apiRequest("/reports/team"),
@@ -172,9 +200,7 @@ const Api = {
   exportCsv: (startDate, endDate) =>
     apiRequest(`/checkins/export?startDate=${startDate}&endDate=${endDate}`, { isBlob: true }),
 
-  // Active users only by default; pass true to include deactivated
-  getUsers: (includeInactive = false) =>
-    apiRequest(`/users${includeInactive ? "?includeInactive=1" : ""}`),
+  getUsers: (includeInactive = false) => apiRequest(`/users${includeInactive ? "?includeInactive=1" : ""}`),
   createUser: (user) => apiRequest("/users", { method: "POST", body: user }),
   approveDevice: (id) => apiRequest(`/users/${id}/approve-device`, { method: "POST" }),
   resetDevice: (id) => apiRequest(`/users/${id}/reset-device`, { method: "POST" }),
@@ -198,13 +224,11 @@ const Api = {
   reviewReport: (id) => apiRequest(`/field/reports/${id}/review`, { method: "PATCH" }),
 
   getSurveys: () => apiRequest("/field/surveys"),
-  answerSurvey: (id, answer) =>
-    apiRequest(`/field/surveys/${id}/answer`, { method: "POST", body: { answer } }),
+  answerSurvey: (id, answer) => apiRequest(`/field/surveys/${id}/answer`, { method: "POST", body: { answer } }),
   createSurvey: (payload) => apiRequest("/field/surveys", { method: "POST", body: payload }),
 
   getAnnouncements: () => apiRequest("/field/announcements"),
-  createAnnouncement: (payload) =>
-    apiRequest("/field/announcements", { method: "POST", body: payload }),
+  createAnnouncement: (payload) => apiRequest("/field/announcements", { method: "POST", body: payload }),
 
   getNotifications: () => apiRequest("/field/notifications"),
   markNotificationsRead: () => apiRequest("/field/notifications/read", { method: "POST" }),
@@ -213,15 +237,44 @@ const Api = {
 };
 
 async function checkInWithOffline(payload) {
+  const userId = Auth.getUser()?.id;
+  if (!userId) throw new Error("Your session is missing. Please sign in again.");
+
+  const type = payload.type;
+  if (!payload.clientEventId) payload.clientEventId = getClientEventId();
+
+  // Prevent a second offline check-in/out from being queued while the first
+  // one is still waiting for connectivity.
+  if (await OfflineQueue.hasPendingCheckin(type)) {
+    const error = new Error(
+      type === "check_in"
+        ? "A check-in is already waiting to sync."
+        : "A check-out is already waiting to sync."
+    );
+    error.code = "OFFLINE_EVENT_PENDING";
+    throw error;
+  }
+
   if (!navigator.onLine) {
-    await OfflineQueue.enqueue({ kind: "checkin", payload });
+    await OfflineQueue.enqueue({
+      kind: "checkin",
+      ownerUserId: userId,
+      payload,
+    });
     return { offline: true, message: "Saved offline – will sync when online." };
   }
+
   try {
     return await Api.checkIn(payload);
   } catch (err) {
+    // The same clientEventId is retained when a response is lost. If the
+    // server actually committed the event, retrying is now idempotent.
     if (err.message.includes("Network error")) {
-      await OfflineQueue.enqueue({ kind: "checkin", payload });
+      await OfflineQueue.enqueue({
+        kind: "checkin",
+        ownerUserId: userId,
+        payload,
+      });
       return { offline: true, message: "Saved offline – will sync when online." };
     }
     throw err;
@@ -229,15 +282,17 @@ async function checkInWithOffline(payload) {
 }
 
 async function submitReportWithOffline(payload) {
+  const userId = Auth.getUser()?.id;
+  if (!userId) throw new Error("Your session is missing. Please sign in again.");
   if (!navigator.onLine) {
-    await OfflineQueue.enqueue({ kind: "report", payload });
+    await OfflineQueue.enqueue({ kind: "report", ownerUserId: userId, payload });
     return { offline: true, message: "Report saved offline – will sync when online." };
   }
   try {
     return await Api.submitReport(payload);
   } catch (err) {
     if (err.message.includes("Network error")) {
-      await OfflineQueue.enqueue({ kind: "report", payload });
+      await OfflineQueue.enqueue({ kind: "report", ownerUserId: userId, payload });
       return { offline: true, message: "Report saved offline – will sync when online." };
     }
     throw err;
@@ -245,16 +300,28 @@ async function submitReportWithOffline(payload) {
 }
 
 async function flushOfflineQueue() {
+  const currentUserId = Auth.getUser()?.id;
+  if (!currentUserId || !navigator.onLine) return 0;
+
   const items = await OfflineQueue.list();
   let synced = 0;
   for (const item of items) {
+    // Never submit an offline record under a different logged-in user.
+    // Legacy records without an owner are intentionally left untouched rather
+    // than risking cross-account attendance corruption.
+    if (item.ownerUserId !== currentUserId) continue;
+
     try {
       if (item.kind === "checkin") await Api.checkIn(item.payload);
       else if (item.kind === "report") await Api.submitReport(item.payload);
       await OfflineQueue.remove(item.id);
       synced++;
-    } catch {
-      // keep for next attempt
+    } catch (err) {
+      // Keep network failures for the next attempt. Permanent validation or
+      // authorization errors are removed so the queue cannot retry forever.
+      if (err.status >= 400 && err.status < 500 && err.status !== 429) {
+        await OfflineQueue.remove(item.id);
+      }
     }
   }
   return synced;
