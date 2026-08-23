@@ -77,7 +77,6 @@ async function main() {
       console.log(`Seeded ${Math.min(i + 100, WORKERS)}/${WORKERS} workers`);
     }
 
-    // Verify real authentication without hammering the login rate limiter.
     const loginChecks = [];
     for (let i = 0; i < Math.min(5, WORKERS); i++) {
       loginChecks.push(http('/api/auth/login', { method: 'POST', body: JSON.stringify({ username: values[i].username, password: PASSWORD }) }));
@@ -90,9 +89,11 @@ async function main() {
 
     const runBatch = async (n, type) => {
       const ids = created.userIds.slice(0, n);
+      const eventIds = [];
       const started = performance.now();
       const results = await Promise.all(ids.map((userId, index) => {
         const clientEventId = randomUUID();
+        eventIds.push(clientEventId);
         return http('/api/checkins', {
           method: 'POST',
           headers: { authorization: `Bearer ${tokenFor(userId)}` },
@@ -111,12 +112,17 @@ async function main() {
       const elapsed = performance.now() - started;
       const latency = stats(results.map(r => r.ms));
       const counts = results.reduce((m, r) => { m[r.status] = (m[r.status] || 0) + 1; return m; }, {});
-      const expected = type === 'check_in' ? 201 : 201;
-      const success = results.filter(r => r.status === expected).length;
-      const idsResult = await db.query(`SELECT COUNT(*)::int AS count FROM checkins WHERE user_id = ANY($1::int[]) AND type = $2`, [ids, type]);
-      console.log(`${type} ${n}: success=${success}/${n} statuses=${JSON.stringify(counts)} elapsed=${Math.round(elapsed)}ms latency=${JSON.stringify(latency)} dbRows=${idsResult.rows[0].count}`);
+      const success = results.filter(r => r.status === 201).length;
+      // Validate only the exact rows produced by this batch. Previous stress levels
+      // intentionally remain in the database until final cleanup, so counting by
+      // user/type alone incorrectly treated cumulative rows as a failure.
+      const idsResult = await db.query(
+        `SELECT COUNT(*)::int AS count FROM checkins WHERE client_event_id = ANY($1::uuid[]) AND type = $2`,
+        [eventIds, type]
+      );
+      console.log(`${type} ${n}: success=${success}/${n} statuses=${JSON.stringify(counts)} elapsed=${Math.round(elapsed)}ms latency=${JSON.stringify(latency)} dbRowsThisBatch=${idsResult.rows[0].count}`);
       if (success !== n || Number(idsResult.rows[0].count) !== n) throw new Error(`${type} integrity failure at ${n}`);
-      return { n, type, elapsed, latency, counts };
+      return { n, type, elapsed, latency, counts, dbRowsThisBatch: Number(idsResult.rows[0].count) };
     };
 
     const results = [];
@@ -126,7 +132,6 @@ async function main() {
       results.push(await runBatch(n, 'check_out'));
     }
 
-    // Same event ID, same worker, many concurrent retries: exactly one row.
     const raceUser = created.userIds[0];
     const raceToken = tokenFor(raceUser);
     const eventId = randomUUID();
@@ -139,7 +144,6 @@ async function main() {
     console.log(`Idempotency: statuses=${JSON.stringify(duplicateStatuses)} dbRows=${duplicateRows.rows[0].count}`);
     if (Number(duplicateRows.rows[0].count) !== 1) throw new Error('IDEMPOTENCY FAILURE: duplicate event created multiple rows');
 
-    // Unique-event race on the same worker: row lock should allow one check-in and reject the rest.
     const raceWorker = created.userIds[1];
     const race = await Promise.all(Array.from({ length: 10 }, () => http('/api/checkins', {
       method: 'POST', headers: { authorization: `Bearer ${tokenFor(raceWorker)}` },
