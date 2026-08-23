@@ -3,8 +3,17 @@ const I18N = {
   en: {
     appName: "HiTechNour",
     siteAttendance: "Site Attendance",
+    welcomeBack: "WELCOME BACK",
+    loginTitle: "Sign in to continue",
+    loginSubtitle: "Use your HiTechNour account to access attendance.",
+    secureSignIn: "Secure sign in",
+    about: "About Hitechnour",
+    partners: "Partners",
+    contact: "Contact",
     username: "Username",
     password: "Password",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     signIn: "Sign In",
     checkIn: "Check In",
     checkOut: "Check Out",
@@ -58,14 +67,23 @@ const I18N = {
   ar: {
     appName: "هاي تك نور",
     siteAttendance: "حضور المواقع",
+    welcomeBack: "مرحباً بعودتك",
+    loginTitle: "سجّل الدخول للمتابعة",
+    loginSubtitle: "استخدم حساب هاي تك نور للوصول إلى نظام الحضور.",
+    secureSignIn: "تسجيل دخول آمن",
+    about: "عن هاي تك نور",
+    partners: "الشركاء",
+    contact: "تواصل معنا",
     username: "اسم المستخدم",
     password: "كلمة المرور",
+    showPassword: "إظهار كلمة المرور",
+    hidePassword: "إخفاء كلمة المرور",
     signIn: "تسجيل الدخول",
     checkIn: "تسجيل حضور",
     checkOut: "تسجيل انصراف",
     checkedIn: "تم تسجيل الحضور",
     checkedOut: "تم تسجيل الانصراف",
-    offlineQueue: "تم الحفظ بدون إنترنت – سيتم المزامنة عند الاتصال",
+    offlineQueue: "تم الحفظ بدون إنترنت – ستتم المزامنة عند الاتصال",
     distance: "المسافة",
     inside: "داخل",
     outside: "خارج",
@@ -152,6 +170,23 @@ function applyTranslations() {
     if (label) label.textContent = text;
     else el.textContent = text;
   });
+
+  // Login screen has static marketing copy, so translate it explicitly too.
+  const loginKicker = document.querySelector("#login-screen .login-kicker");
+  const loginTitle = document.querySelector("#login-screen .login-heading h1");
+  const loginSubtitle = document.querySelector("#login-screen .login-heading p");
+  const security = document.querySelector("#login-screen .login-security-note");
+  const about = document.getElementById("open-company-about");
+  const companyLinks = document.querySelectorAll("#login-screen .company-link");
+
+  if (loginKicker) loginKicker.textContent = t("welcomeBack");
+  if (loginTitle) loginTitle.textContent = t("loginTitle");
+  if (loginSubtitle) loginSubtitle.textContent = t("loginSubtitle");
+  if (security) security.innerHTML = `<i></i> ${t("secureSignIn")}`;
+  if (about) about.textContent = t("about");
+  if (companyLinks[1]) companyLinks[1].textContent = t("partners");
+  if (companyLinks[2]) companyLinks[2].textContent = t("contact");
+
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
     const key = el.getAttribute("data-i18n-placeholder");
     if (key) el.setAttribute("placeholder", t(key));
@@ -160,6 +195,15 @@ function applyTranslations() {
     const key = el.getAttribute("data-i18n-title");
     if (key) el.setAttribute("title", t(key));
   });
+
+  const passwordToggle = document.getElementById("toggle-password");
+  if (passwordToggle) {
+    const visible = document.getElementById("login-password")?.type === "text";
+    const label = visible ? t("hidePassword") : t("showPassword");
+    passwordToggle.setAttribute("aria-label", label);
+    passwordToggle.setAttribute("title", label);
+  }
+
   try {
     if (typeof state !== "undefined" && state.isCheckedIn !== undefined) {
       const btn = document.getElementById("checkin-button");
