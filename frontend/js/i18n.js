@@ -10,6 +10,12 @@ const I18N = {
     about: "About Hitechnour",
     partners: "Partners",
     contact: "Contact",
+    leftTitle: "ONE PLACE TO MANAGE EVERY WORKING DAY.",
+    leftSubtitle: "Secure attendance, site visibility and workforce operations in one focused workspace.",
+    verified: "Verified site attendance",
+    locationAware: "Location-aware operations",
+    builtFor: "Built for your workforce",
+    platform: "HITECHNOUR · ATTENDANCE PLATFORM",
     username: "Username",
     password: "Password",
     showPassword: "Show password",
@@ -74,6 +80,12 @@ const I18N = {
     about: "عن هاي تك نور",
     partners: "الشركاء",
     contact: "تواصل معنا",
+    leftTitle: "مكان واحد لإدارة كل يوم عمل.",
+    leftSubtitle: "حضور آمن، رؤية للمواقع وإدارة عمليات فريق العمل في مساحة عمل واحدة.",
+    verified: "حضور مواقع موثّق",
+    locationAware: "عمليات مرتبطة بالموقع",
+    builtFor: "مصمم لفريق عملك",
+    platform: "هاي تك نور · منصة الحضور",
     username: "اسم المستخدم",
     password: "كلمة المرور",
     showPassword: "إظهار كلمة المرور",
@@ -171,21 +183,43 @@ function applyTranslations() {
     else el.textContent = text;
   });
 
-  // Login screen has static marketing copy, so translate it explicitly too.
-  const loginKicker = document.querySelector("#login-screen .login-kicker");
-  const loginTitle = document.querySelector("#login-screen .login-heading h1");
-  const loginSubtitle = document.querySelector("#login-screen .login-heading p");
-  const security = document.querySelector("#login-screen .login-security-note");
-  const about = document.getElementById("open-company-about");
-  const companyLinks = document.querySelectorAll("#login-screen .company-link");
+  const login = document.querySelector("#login-screen");
+  if (login) {
+    const loginKicker = login.querySelector(".login-kicker");
+    const loginTitle = login.querySelector(".login-heading h1");
+    const loginSubtitle = login.querySelector(".login-heading p");
+    const security = login.querySelector(".login-security-note");
+    const about = document.getElementById("open-company-about");
+    const companyLinks = login.querySelectorAll(".company-link");
+    const leftEyebrow = login.querySelector(".login-visual-copy .eyebrow");
+    const leftTitle = login.querySelector(".login-visual-copy h2");
+    const leftSubtitle = login.querySelector(".login-visual-copy p");
+    const leftPoints = login.querySelectorAll(".login-visual-points span");
+    const leftFooter = login.querySelector(".login-visual-footer");
 
-  if (loginKicker) loginKicker.textContent = t("welcomeBack");
-  if (loginTitle) loginTitle.textContent = t("loginTitle");
-  if (loginSubtitle) loginSubtitle.textContent = t("loginSubtitle");
-  if (security) security.innerHTML = `<i></i> ${t("secureSignIn")}`;
-  if (about) about.textContent = t("about");
-  if (companyLinks[1]) companyLinks[1].textContent = t("partners");
-  if (companyLinks[2]) companyLinks[2].textContent = t("contact");
+    if (loginKicker) loginKicker.textContent = t("welcomeBack");
+    if (loginTitle) loginTitle.textContent = t("loginTitle");
+    if (loginSubtitle) loginSubtitle.textContent = t("loginSubtitle");
+    if (security) security.innerHTML = `<i></i> ${t("secureSignIn")}`;
+    if (about) about.textContent = t("about");
+    if (companyLinks[1]) companyLinks[1].textContent = t("partners");
+    if (companyLinks[2]) companyLinks[2].textContent = t("contact");
+    if (leftEyebrow) leftEyebrow.textContent = t("siteAttendance");
+    if (leftTitle) leftTitle.textContent = t("leftTitle");
+    if (leftSubtitle) leftSubtitle.textContent = t("leftSubtitle");
+    if (leftPoints[0]) leftPoints[0].lastChild.textContent = t("verified");
+    if (leftPoints[1]) leftPoints[1].lastChild.textContent = t("locationAware");
+    if (leftPoints[2]) leftPoints[2].lastChild.textContent = t("builtFor");
+    if (leftFooter) leftFooter.textContent = t("platform");
+
+    const passwordToggle = document.getElementById("toggle-password");
+    if (passwordToggle) {
+      const visible = document.getElementById("login-password")?.type === "text";
+      const label = visible ? t("hidePassword") : t("showPassword");
+      passwordToggle.setAttribute("aria-label", label);
+      passwordToggle.setAttribute("title", label);
+    }
+  }
 
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
     const key = el.getAttribute("data-i18n-placeholder");
@@ -195,14 +229,6 @@ function applyTranslations() {
     const key = el.getAttribute("data-i18n-title");
     if (key) el.setAttribute("title", t(key));
   });
-
-  const passwordToggle = document.getElementById("toggle-password");
-  if (passwordToggle) {
-    const visible = document.getElementById("login-password")?.type === "text";
-    const label = visible ? t("hidePassword") : t("showPassword");
-    passwordToggle.setAttribute("aria-label", label);
-    passwordToggle.setAttribute("title", label);
-  }
 
   try {
     if (typeof state !== "undefined" && state.isCheckedIn !== undefined) {
