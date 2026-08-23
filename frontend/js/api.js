@@ -108,7 +108,14 @@ const OfflineQueue = (() => {
     );
   }
 
-  return { enqueue, list, remove, countForCurrentUser, hasPendingCheckin };
+  return {
+    enqueue,
+    list,
+    remove,
+    count: countForCurrentUser,
+    countForCurrentUser,
+    hasPendingCheckin,
+  };
 })();
 
 async function apiRequest(path, { method = "GET", body, isBlob = false } = {}) {
@@ -157,33 +164,19 @@ async function apiRequest(path, { method = "GET", body, isBlob = false } = {}) {
 }
 
 const Api = {
-  login: (username, password) =>
-    apiRequest("/auth/login", { method: "POST", body: { username, password } }),
+  login: (username, password) => apiRequest("/auth/login", { method: "POST", body: { username, password } }),
   me: () => apiRequest("/auth/me"),
-
   myAttendanceSummary: (month) => apiRequest(`/checkins/me/summary${month ? `?month=${month}` : ""}`),
   workerSummary: (id, month) => apiRequest(`/users/${id}/summary${month ? `?month=${month}` : ""}`),
-
   getSites: () => apiRequest("/sites"),
-
   getSkills: () => apiRequest("/skills"),
   createSkill: (name) => apiRequest("/skills", { method: "POST", body: { name } }),
   getSkillWorkers: (skillId) => apiRequest(`/skills/${skillId}/workers`),
-  setWorkerSkill: (userId, skillId, level, notes) =>
-    apiRequest(`/skills/users/${userId}`, {
-      method: "POST",
-      body: { skillId, level, notes },
-    }),
-  removeWorkerSkill: (userId, skillId) =>
-    apiRequest(`/skills/users/${userId}/${skillId}`, { method: "DELETE" }),
+  setWorkerSkill: (userId, skillId, level, notes) => apiRequest(`/skills/users/${userId}`, { method: "POST", body: { skillId, level, notes } }),
+  removeWorkerSkill: (userId, skillId) => apiRequest(`/skills/users/${userId}/${skillId}`, { method: "DELETE" }),
   getSiteRequirements: (siteId) => apiRequest(`/skills/sites/${siteId}`),
-  setSiteRequirement: (siteId, skillId, workersNeeded) =>
-    apiRequest(`/skills/sites/${siteId}`, {
-      method: "POST",
-      body: { skillId, workersNeeded },
-    }),
+  setSiteRequirement: (siteId, skillId, workersNeeded) => apiRequest(`/skills/sites/${siteId}`, { method: "POST", body: { skillId, workersNeeded } }),
   removeSiteRequirement: (siteId, skillId) => apiRequest(`/skills/sites/${siteId}/${skillId}`, { method: "DELETE" }),
-
   getOverview: () => apiRequest("/reports/overview"),
   getTeamBySite: () => apiRequest("/reports/team"),
   getWorkerDaily: (id, month) => apiRequest(`/users/${id}/daily${month ? `?month=${month}` : ""}`),
@@ -192,47 +185,36 @@ const Api = {
   getAllCheckins: () => apiRequest("/checkins"),
   createSite: (site) => apiRequest("/sites", { method: "POST", body: site }),
   updateSite: (id, patch) => apiRequest(`/sites/${id}`, { method: "PUT", body: patch }),
-
   checkIn: (payload) => apiRequest("/checkins", { method: "POST", body: payload }),
   myCheckins: () => apiRequest("/checkins/me"),
   allCheckins: (flaggedOnly) => apiRequest(`/checkins${flaggedOnly ? "?flagged=true" : ""}`),
   reviewCheckin: (id) => apiRequest(`/checkins/${id}/review`, { method: "PATCH" }),
-  exportCsv: (startDate, endDate) =>
-    apiRequest(`/checkins/export?startDate=${startDate}&endDate=${endDate}`, { isBlob: true }),
-
+  exportCsv: (startDate, endDate) => apiRequest(`/checkins/export?startDate=${startDate}&endDate=${endDate}`, { isBlob: true }),
   getUsers: (includeInactive = false) => apiRequest(`/users${includeInactive ? "?includeInactive=1" : ""}`),
   createUser: (user) => apiRequest("/users", { method: "POST", body: user }),
   approveDevice: (id) => apiRequest(`/users/${id}/approve-device`, { method: "POST" }),
   resetDevice: (id) => apiRequest(`/users/${id}/reset-device`, { method: "POST" }),
   forceLogout: (id) => apiRequest(`/users/${id}/force-logout`, { method: "POST" }),
-  resetPassword: (id, newPassword) =>
-    apiRequest(`/users/${id}/reset-password`, { method: "POST", body: { newPassword } }),
-
+  resetPassword: (id, newPassword) => apiRequest(`/users/${id}/reset-password`, { method: "POST", body: { newPassword } }),
   updateMyProfile: (patch) => apiRequest("/users/me", { method: "PATCH", body: patch }),
   deleteMyAccount: () => apiRequest("/users/me", { method: "DELETE" }),
-
   myAssignmentToday: () => apiRequest("/assignments/me/today"),
   mySchedule: () => apiRequest("/assignments/me"),
   getAssignments: (date) => apiRequest(`/assignments${date ? `?date=${date}` : ""}`),
   createAssignment: (a) => apiRequest("/assignments", { method: "POST", body: a }),
   updateAssignment: (id, patch) => apiRequest(`/assignments/${id}`, { method: "PATCH", body: patch }),
   deleteAssignment: (id) => apiRequest(`/assignments/${id}`, { method: "DELETE" }),
-
   submitReport: (payload) => apiRequest("/field/reports", { method: "POST", body: payload }),
   myReports: () => apiRequest("/field/reports/me"),
   allReports: (openOnly) => apiRequest(`/field/reports${openOnly ? "?open=true" : ""}`),
   reviewReport: (id) => apiRequest(`/field/reports/${id}/review`, { method: "PATCH" }),
-
   getSurveys: () => apiRequest("/field/surveys"),
   answerSurvey: (id, answer) => apiRequest(`/field/surveys/${id}/answer`, { method: "POST", body: { answer } }),
   createSurvey: (payload) => apiRequest("/field/surveys", { method: "POST", body: payload }),
-
   getAnnouncements: () => apiRequest("/field/announcements"),
   createAnnouncement: (payload) => apiRequest("/field/announcements", { method: "POST", body: payload }),
-
   getNotifications: () => apiRequest("/field/notifications"),
   markNotificationsRead: () => apiRequest("/field/notifications/read", { method: "POST" }),
-
   getActivity: () => apiRequest("/field/activity"),
 };
 
@@ -241,40 +223,25 @@ async function checkInWithOffline(payload) {
   if (!userId) throw new Error("Your session is missing. Please sign in again.");
 
   const type = payload.type;
+  if (type !== "check_in" && type !== "check_out") throw new Error("Invalid attendance action.");
   if (!payload.clientEventId) payload.clientEventId = getClientEventId();
 
-  // Prevent a second offline check-in/out from being queued while the first
-  // one is still waiting for connectivity.
   if (await OfflineQueue.hasPendingCheckin(type)) {
-    const error = new Error(
-      type === "check_in"
-        ? "A check-in is already waiting to sync."
-        : "A check-out is already waiting to sync."
-    );
+    const error = new Error(type === "check_in" ? "A check-in is already waiting to sync." : "A check-out is already waiting to sync.");
     error.code = "OFFLINE_EVENT_PENDING";
     throw error;
   }
 
   if (!navigator.onLine) {
-    await OfflineQueue.enqueue({
-      kind: "checkin",
-      ownerUserId: userId,
-      payload,
-    });
+    await OfflineQueue.enqueue({ kind: "checkin", ownerUserId: userId, payload });
     return { offline: true, message: "Saved offline – will sync when online." };
   }
 
   try {
     return await Api.checkIn(payload);
   } catch (err) {
-    // The same clientEventId is retained when a response is lost. If the
-    // server actually committed the event, retrying is now idempotent.
     if (err.message.includes("Network error")) {
-      await OfflineQueue.enqueue({
-        kind: "checkin",
-        ownerUserId: userId,
-        payload,
-      });
+      await OfflineQueue.enqueue({ kind: "checkin", ownerUserId: userId, payload });
       return { offline: true, message: "Saved offline – will sync when online." };
     }
     throw err;
@@ -306,9 +273,6 @@ async function flushOfflineQueue() {
   const items = await OfflineQueue.list();
   let synced = 0;
   for (const item of items) {
-    // Never submit an offline record under a different logged-in user.
-    // Legacy records without an owner are intentionally left untouched rather
-    // than risking cross-account attendance corruption.
     if (item.ownerUserId !== currentUserId) continue;
 
     try {
@@ -317,8 +281,6 @@ async function flushOfflineQueue() {
       await OfflineQueue.remove(item.id);
       synced++;
     } catch (err) {
-      // Keep network failures for the next attempt. Permanent validation or
-      // authorization errors are removed so the queue cannot retry forever.
       if (err.status >= 400 && err.status < 500 && err.status !== 429) {
         await OfflineQueue.remove(item.id);
       }
@@ -330,9 +292,7 @@ async function flushOfflineQueue() {
 if (typeof window !== "undefined") {
   window.addEventListener("online", () => {
     flushOfflineQueue().then((n) => {
-      if (n > 0 && window.showToast) {
-        window.showToast(`${n} offline item(s) synced`, "success");
-      }
+      if (n > 0 && window.showToast) window.showToast(`${n} offline item(s) synced`, "success");
     });
   });
 }
