@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "migrate": "node src/migrate.js"
+    "migrate": "node src/migrate.js",
+    "test": "node --test test",
+    "test:concurrency": "node --test test/checkins.concurrency.test.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
