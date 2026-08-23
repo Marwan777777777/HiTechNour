@@ -48,16 +48,11 @@ CREATE TABLE IF NOT EXISTS checkins (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_checkins_user_client_event
-  ON checkins (user_id, client_event_id);
+-- Created by migrate.js after legacy rows have been backfilled with IDs.
 CREATE INDEX IF NOT EXISTS idx_checkins_user_time ON checkins (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_checkins_user_type_time ON checkins (user_id, type, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_checkins_flagged ON checkins (flagged) WHERE flagged = true;
 
--- One row = one worker assigned to one site for a date range, with an
--- optional task description. A "team" for a given day is just every
--- assignment that shares the same site_id + overlapping dates - no
--- separate teams table needed for that.
 CREATE TABLE IF NOT EXISTS assignments (
   id           SERIAL PRIMARY KEY,
   user_id      INTEGER NOT NULL REFERENCES users(id),
@@ -102,7 +97,7 @@ CREATE TABLE IF NOT EXISTS reports (
   status      TEXT NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted', 'reviewed')),
   reviewed_by INTEGER REFERENCES users(id),
   reviewed_at TIMESTAMPTZ,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_reports_user ON reports (user_id, created_at DESC);
