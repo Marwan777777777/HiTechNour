@@ -2,22 +2,10 @@ const express = require("express");
 const pool = require("../db");
 const { requireAuth, requireAdmin } = require("../middleware/auth");
 const { checkinLimiter } = require("../middleware/rateLimit");
-const { haversineMeters } = require("../utils/geo");
-const { isImpossibleTravel } = require("../utils/impossibleTravel");
-const { isValidLat, isValidLng, isNonEmptyString } = require("../utils/validate");
+const { processCheckin } = require("../services/checkinService");
 const { getMonthlyAttendance } = require("../utils/attendance");
 
 const router = express.Router();
-
-const BLOCK_ON_DEVICE_MISMATCH = process.env.BLOCK_ON_DEVICE_MISMATCH !== "false";
-const WORK_HOURS_START = Number(process.env.WORK_HOURS_START ?? 6);
-const WORK_HOURS_END = Number(process.env.WORK_HOURS_END ?? 20);
-const MAX_ACCEPTABLE_ACCURACY_METERS = Number(process.env.MAX_ACCEPTABLE_ACCURACY_METERS ?? 100);
-
-function isOffHours(date) {
-  const hour = date.getHours();
-  return hour < WORK_HOURS_START || hour >= WORK_HOURS_END;
-}
 
 async function notifyAdmins(title, body, kind) {
   try {
@@ -31,140 +19,38 @@ async function notifyAdmins(title, body, kind) {
       );
     }
   } catch (_) {
-    // never fail the check-in because of notification
+    // Never fail an already-committed attendance event because notification delivery failed.
   }
 }
 
 router.post("/", requireAuth, checkinLimiter, async (req, res, next) => {
   try {
-    const { siteId, lat, lng, accuracyMeters, deviceId, isMockLocation, type } = req.body;
+    const result = await processCheckin(pool, req.user.id, req.body);
+    const row = result.row;
 
-    if (!siteId || !isValidLat(lat) || !isValidLng(lng) || !isNonEmptyString(deviceId, 200)) {
-      return res.status(400).json({ error: "siteId, valid lat/lng, and deviceId are required." });
-    }
-    const checkinType = type === "check_out" ? "check_out" : "check_in";
-    if (accuracyMeters !== undefined && accuracyMeters !== null) {
-      if (typeof accuracyMeters !== "number" || !Number.isFinite(accuracyMeters) || accuracyMeters < 0) {
-        return res.status(400).json({ error: "accuracyMeters must be a non-negative number." });
-      }
-    }
-
-    const siteResult = await pool.query(
-      "SELECT id, name, lat, lng, radius_meters FROM sites WHERE id = $1 AND active = true",
-      [siteId]
-    );
-    const site = siteResult.rows[0];
-    if (!site) return res.status(404).json({ error: "Site not found." });
-
-    const userResult = await pool.query(
-      "SELECT id, device_id, pending_device_id, full_name, username FROM users WHERE id = $1",
-      [req.user.id]
-    );
-    const user = userResult.rows[0];
-
-    let deviceMatched = true;
-    if (!user.device_id) {
-      if (!user.pending_device_id) {
-        await pool.query("UPDATE users SET pending_device_id = $1 WHERE id = $2", [deviceId, user.id]);
-      }
-      return res.status(403).json({
-        error:
-          "This device is awaiting admin approval before it can be used for check-ins. Ask your admin to approve it.",
-        pending: true,
-      });
-    } else if (user.device_id !== deviceId) {
-      deviceMatched = false;
-      if (BLOCK_ON_DEVICE_MISMATCH) {
-        return res.status(403).json({
-          error:
-            "This device isn't the one approved for your account. Ask an admin to reset your device binding if you're on a new phone.",
-        });
-      }
-    }
-
-    const distance = haversineMeters(lat, lng, site.lat, site.lng);
-    const status = distance <= site.radius_meters ? "inside" : "outside";
-
-    const prevResult = await pool.query(
-      "SELECT lat, lng, created_at FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
-      [user.id]
-    );
-    const now = new Date();
-    const impossibleTravel = isImpossibleTravel(prevResult.rows[0], lat, lng, now);
-    const offHours = isOffHours(now);
-    const lowAccuracy =
-      accuracyMeters != null && accuracyMeters > MAX_ACCEPTABLE_ACCURACY_METERS;
-
-    let checkoutWithoutCheckin = false;
-    if (checkinType === "check_out") {
-      const lastEventResult = await pool.query(
-        "SELECT type FROM checkins WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
-        [user.id]
+    // Duplicate/idempotent retries return the original event without creating
+    // another notification or changing attendance state.
+    if (!result.duplicate) {
+      const workerName = result.user.full_name || result.user.username;
+      const action = row.type === "check_out" ? "checked out" : "checked in";
+      const flagNote = row.flagged
+        ? ` · FLAG: ${(row.flag_reason || "").replace(/_/g, " ")}`
+        : "";
+      await notifyAdmins(
+        `${workerName} ${action}`,
+        `${result.siteName} · ${row.status}${flagNote}`,
+        row.flagged ? "flag" : "checkin"
       );
-      const lastType = lastEventResult.rows[0]?.type;
-      if (lastType !== "check_in") checkoutWithoutCheckin = true;
     }
 
-    let flagged = false;
-    let flagReason = null;
-    if (!deviceMatched) {
-      flagged = true;
-      flagReason = "device_mismatch";
-    } else if (isMockLocation) {
-      flagged = true;
-      flagReason = "mock_location";
-    } else if (impossibleTravel) {
-      flagged = true;
-      flagReason = "impossible_travel";
-    } else if (status === "outside") {
-      flagged = true;
-      flagReason = "outside_radius";
-    } else if (lowAccuracy) {
-      flagged = true;
-      flagReason = "low_accuracy";
-    } else if (checkoutWithoutCheckin) {
-      flagged = true;
-      flagReason = "checkout_without_checkin";
-    } else if (offHours) {
-      flagged = true;
-      flagReason = "off_hours";
-    }
-
-    const inserted = await pool.query(
-      `INSERT INTO checkins
-        (user_id, site_id, type, lat, lng, accuracy_meters, distance_meters, status,
-         device_id, device_matched, is_mock_location, is_off_hours, flagged, flag_reason)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-       RETURNING id, type, distance_meters, status, flagged, flag_reason, created_at`,
-      [
-        user.id,
-        siteId,
-        checkinType,
-        lat,
-        lng,
-        accuracyMeters ?? null,
-        distance,
-        status,
-        deviceId,
-        deviceMatched,
-        !!isMockLocation,
-        offHours,
-        flagged,
-        flagReason,
-      ]
-    );
-
-    const workerName = user.full_name || user.username;
-    const action = checkinType === "check_out" ? "checked out" : "checked in";
-    const flagNote = flagged ? ` · FLAG: ${(flagReason || "").replace(/_/g, " ")}` : "";
-    await notifyAdmins(
-      `${workerName} ${action}`,
-      `${site.name} · ${status}${flagNote}`,
-      flagged ? "flag" : "checkin"
-    );
-
-    res.status(201).json(inserted.rows[0]);
+    res.status(result.duplicate ? 200 : 201).json(row);
   } catch (err) {
+    if (err.status) {
+      const body = { error: err.message };
+      if (err.pending) body.pending = true;
+      if (err.code) body.code = err.code;
+      return res.status(err.status).json(body);
+    }
     next(err);
   }
 });
@@ -238,7 +124,8 @@ router.get("/export", requireAuth, requireAdmin, async (req, res, next) => {
        FROM checkins c
        JOIN users u ON u.id = c.user_id
        JOIN sites s ON s.id = c.site_id
-       WHERE c.created_at BETWEEN $1 AND $2
+       WHERE c.created_at >= $1::date
+         AND c.created_at < ($2::date + INTERVAL '1 day')
        ORDER BY c.created_at DESC`,
       [startDate, endDate]
     );
