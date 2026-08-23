@@ -1,0 +1,7 @@
+{
+  "name": "hitechnour-stress-runner",
+  "private": true,
+  "scripts": {
+    "start": "cd backend && npm install --omit=dev && node scripts/full-stress-runner.js"
+  }
+}
