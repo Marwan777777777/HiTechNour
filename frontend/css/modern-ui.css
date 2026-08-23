@@ -207,3 +207,62 @@ html[dir="rtl"] #app-screen .worker-tabs{direction:rtl;}
   html[dir="rtl"] #app-screen .status-pill{left:auto;right:12px;}
 }
 @media(prefers-reduced-motion:reduce){#app-screen .worker-panel{animation:none}.social-link{transition:none}}
+
+/* ==========================================================================
+   Login: unified top brand bar (replaces the old .login-mobile-brand hack
+   that was forced onto desktop via !important in brand.css — that rule is
+   now dead since the element it targeted no longer exists in the DOM).
+   This bar spans the full card width, centered, above both columns.
+   ========================================================================== */
+.login-shell{position:relative;padding-top:96px;}
+.login-top-brand{
+  position:absolute;
+  top:26px; left:0; right:0;
+  z-index:2;
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  pointer-events:none;
+}
+.hn-mark{width:46px;height:29px;filter:drop-shadow(0 0 10px rgba(94,169,255,.55));}
+.login-top-brand-text strong{
+  display:block; text-align:center;
+  font-family:'Space Grotesk',Inter,sans-serif;
+  font-weight:700; font-size:17px; color:#f3f7fc; letter-spacing:-.2px;
+}
+.login-top-brand-text span{
+  display:block; text-align:center;
+  font:8px/1 'JetBrains Mono',monospace; letter-spacing:2.5px; color:#7d91ac;
+  margin-top:2px;
+}
+.login-top-lang{
+  position:absolute;
+  top:26px; right:26px;
+  z-index:3;
+  width:64px; height:30px;
+  border-radius:9px;
+  background:#0b1627;
+  border:1px solid #344862;
+  color:#dbe6f5;
+  font:600 11px Inter,sans-serif;
+  display:flex; align-items:center; justify-content:center; gap:4px;
+}
+html[dir="rtl"] .login-top-lang{right:auto; left:26px;}
+
+/* Site-attendance / location-aware illustration in the left panel */
+.login-illustration{
+  width:100%; max-width:300px; height:auto;
+  margin:6px 0 18px;
+  overflow:visible;
+}
+
+@media(max-width:760px){
+  .login-shell{padding-top:110px;}
+  .login-top-brand{top:30px;}
+  .login-top-lang{top:30px; right:18px;}
+  html[dir="rtl"] .login-top-lang{right:auto; left:18px;}
+  .login-heading{margin-top:0;}
+}
+
+/* login-panel-top is now empty (brand + lang toggle moved to .login-top-brand /
+   .login-top-lang above), so its old reserved spacing must be zeroed out or
+   the heading gets pushed down twice. */
+.login-panel-top{margin:0!important; min-height:0!important; padding:0!important;}
