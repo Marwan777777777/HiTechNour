@@ -4,18 +4,13 @@ const path = require("path");
 const bcrypt = require("bcrypt");
 const pool = require("./db");
 
-// Applies schema.sql (all CREATE TABLE IF NOT EXISTS / safe ALTERs) and
-// seeds the first admin if none exists yet. Safe to call on every server
-// startup - nothing here destroys or overwrites existing data, so it can
-// run automatically on every deploy instead of needing a manual command.
+// Applies schema.sql and safe upgrades. Safe to call on every deployment.
 async function applyMigrations() {
   const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
   console.log("[migrate] Applying schema...");
   await pool.query(schema);
   console.log("[migrate] Schema applied.");
 
-  // CREATE TABLE IF NOT EXISTS in schema.sql won't add columns to a table
-  // that's already there - this covers upgrading an existing deployment.
   await pool.query(
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0"
   );
@@ -23,7 +18,28 @@ async function applyMigrations() {
   await pool.query(
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS locale TEXT NOT NULL DEFAULT 'en'"
   );
-  console.log("[migrate] Ensured token_version, title and locale columns exist.");
+
+  // Existing deployments may already have checkins rows created before
+  // idempotency was introduced. Give those historical rows deterministic IDs,
+  // then enforce the invariant for all future rows.
+  await pool.query(
+    "ALTER TABLE checkins ADD COLUMN IF NOT EXISTS client_event_id UUID"
+  );
+  await pool.query(`
+    UPDATE checkins
+    SET client_event_id = md5(
+      id::text || ':' || user_id::text || ':' || created_at::text
+    )::uuid
+    WHERE client_event_id IS NULL
+  `);
+  await pool.query(
+    "ALTER TABLE checkins ALTER COLUMN client_event_id SET NOT NULL"
+  );
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_checkins_user_client_event
+    ON checkins (user_id, client_event_id)
+  `);
+  console.log("[migrate] Ensured idempotent check-in event IDs.");
 
   const { rows } = await pool.query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
   if (rows.length === 0) {
@@ -46,9 +62,6 @@ async function applyMigrations() {
   }
 }
 
-// Only run as a standalone CLI script (`node src/migrate.js`) if invoked
-// directly - when imported by server.js on startup, the caller owns the
-// pool's lifecycle instead.
 if (require.main === module) {
   applyMigrations()
     .then(() => pool.end())
