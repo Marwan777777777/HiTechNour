@@ -49,41 +49,28 @@ async function main() {
     console.log(`Health: HTTP ${health.status} ${Math.round(health.ms)}ms`, health.body);
     if (health.status !== 200) throw new Error('Internal API health check failed');
 
-    const site = await db.query(
-      `INSERT INTO sites (name, address, lat, lng, radius_meters) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-      [`${PREFIX}Stress Site`, 'Synthetic test site', 30.0444, 31.2357, 1000]
-    );
+    const site = await db.query(`INSERT INTO sites (name, address, lat, lng, radius_meters) VALUES ($1,$2,$3,$4,$5) RETURNING id`, [`${PREFIX}Stress Site`, 'Synthetic test site', 30.0444, 31.2357, 1000]);
     created.siteId = site.rows[0].id;
-
     const hash = await bcrypt.hash(PASSWORD, 10);
-    const values = [];
-    for (let i = 0; i < WORKERS; i++) {
-      values.push({
-        username: `${PREFIX}worker_${String(i + 1).padStart(4, '0')}`,
-        fullName: `Stress Worker ${i + 1}`,
-        deviceId: `${PREFIX}device_${i + 1}`,
-      });
-    }
+    const values = Array.from({length: WORKERS}, (_, i) => ({ username: `${PREFIX}worker_${String(i + 1).padStart(4, '0')}`, fullName: `Stress Worker ${i + 1}`, deviceId: `${PREFIX}device_${i + 1}` }));
 
     for (let i = 0; i < values.length; i += 100) {
-      const batch = values.slice(i, i + 100);
-      for (const w of batch) {
-        const r = await db.query(
-          `INSERT INTO users (username,password_hash,full_name,role,device_id,active) VALUES ($1,$2,$3,'employee',$4,true) RETURNING id`,
-          [w.username, hash, w.fullName, w.deviceId]
-        );
+      for (const w of values.slice(i, i + 100)) {
+        const r = await db.query(`INSERT INTO users (username,password_hash,full_name,role,device_id,active) VALUES ($1,$2,$3,'employee',$4,true) RETURNING id`, [w.username, hash, w.fullName, w.deviceId]);
         created.userIds.push(r.rows[0].id);
       }
       console.log(`Seeded ${Math.min(i + 100, WORKERS)}/${WORKERS} workers`);
     }
 
-    const loginChecks = [];
-    for (let i = 0; i < Math.min(5, WORKERS); i++) {
-      loginChecks.push(http('/api/auth/login', { method: 'POST', body: JSON.stringify({ username: values[i].username, password: PASSWORD }) }));
-    }
-    const logins = await Promise.all(loginChecks);
-    console.log('Authentication smoke:', logins.map(x => x.status));
-    if (logins.some(x => x.status !== 200)) throw new Error('Authentication smoke test failed');
+    // Login is intentionally rate-limited by the API. Five concurrent attempts
+    // from one runner IP should produce one success followed by 429s. That is a
+    // protection we want to verify, not a stress-suite failure.
+    const loginChecks = await Promise.all(Array.from({length: 5}, (_, i) => http('/api/auth/login', { method:'POST', body:JSON.stringify({ username:values[i].username, password:PASSWORD }) })));
+    const loginStatuses = loginChecks.map(x => x.status);
+    const loginOk = loginStatuses.filter(s => s === 200).length;
+    const loginLimited = loginStatuses.filter(s => s === 429).length;
+    console.log('Authentication/rate-limit smoke:', loginStatuses);
+    if (loginOk !== 1 || loginLimited !== 4) throw new Error(`Authentication/rate-limit smoke failed: expected 1x200 + 4x429, got ${JSON.stringify(loginStatuses)}`);
 
     const tokenFor = userId => jwt.sign({ id: userId, username: `${PREFIX}worker`, role: 'employee', tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '10m' });
 
@@ -92,86 +79,53 @@ async function main() {
       const eventIds = [];
       const started = performance.now();
       const results = await Promise.all(ids.map((userId, index) => {
-        const clientEventId = randomUUID();
-        eventIds.push(clientEventId);
-        return http('/api/checkins', {
-          method: 'POST',
-          headers: { authorization: `Bearer ${tokenFor(userId)}` },
-          body: JSON.stringify({
-            siteId: created.siteId,
-            lat: 30.0444,
-            lng: 31.2357,
-            accuracyMeters: 5,
-            deviceId: values[index].deviceId,
-            isMockLocation: false,
-            type,
-            clientEventId,
-          }),
-        });
+        const clientEventId = randomUUID(); eventIds.push(clientEventId);
+        return http('/api/checkins', { method:'POST', headers:{authorization:`Bearer ${tokenFor(userId)}`}, body:JSON.stringify({siteId:created.siteId,lat:30.0444,lng:31.2357,accuracyMeters:5,deviceId:values[index].deviceId,isMockLocation:false,type,clientEventId}) });
       }));
       const elapsed = performance.now() - started;
       const latency = stats(results.map(r => r.ms));
-      const counts = results.reduce((m, r) => { m[r.status] = (m[r.status] || 0) + 1; return m; }, {});
+      const counts = results.reduce((m,r)=>(m[r.status]=(m[r.status]||0)+1,m),{});
       const success = results.filter(r => r.status === 201).length;
-      // Validate only the exact rows produced by this batch. Previous stress levels
-      // intentionally remain in the database until final cleanup, so counting by
-      // user/type alone incorrectly treated cumulative rows as a failure.
-      const idsResult = await db.query(
-        `SELECT COUNT(*)::int AS count FROM checkins WHERE client_event_id = ANY($1::uuid[]) AND type = $2`,
-        [eventIds, type]
-      );
+      const idsResult = await db.query(`SELECT COUNT(*)::int AS count FROM checkins WHERE client_event_id = ANY($1::uuid[]) AND type = $2`, [eventIds,type]);
       console.log(`${type} ${n}: success=${success}/${n} statuses=${JSON.stringify(counts)} elapsed=${Math.round(elapsed)}ms latency=${JSON.stringify(latency)} dbRowsThisBatch=${idsResult.rows[0].count}`);
       if (success !== n || Number(idsResult.rows[0].count) !== n) throw new Error(`${type} integrity failure at ${n}`);
-      return { n, type, elapsed, latency, counts, dbRowsThisBatch: Number(idsResult.rows[0].count) };
+      return {n,type,elapsed,latency,counts,dbRowsThisBatch:Number(idsResult.rows[0].count)};
     };
 
     const results = [];
     for (const n of LEVELS) {
       if (!Number.isInteger(n) || n < 1 || n > WORKERS) continue;
-      results.push(await runBatch(n, 'check_in'));
-      results.push(await runBatch(n, 'check_out'));
+      results.push(await runBatch(n,'check_in'));
+      results.push(await runBatch(n,'check_out'));
     }
 
     const raceUser = created.userIds[0];
-    const raceToken = tokenFor(raceUser);
     const eventId = randomUUID();
-    const duplicateResults = await Promise.all(Array.from({ length: 20 }, () => http('/api/checkins', {
-      method: 'POST', headers: { authorization: `Bearer ${raceToken}` },
-      body: JSON.stringify({ siteId: created.siteId, lat: 30.0444, lng: 31.2357, accuracyMeters: 5, deviceId: values[0].deviceId, type: 'check_in', clientEventId: eventId })
-    })));
-    const duplicateStatuses = duplicateResults.reduce((m, r) => { m[r.status] = (m[r.status] || 0) + 1; return m; }, {});
-    const duplicateRows = await db.query(`SELECT COUNT(*)::int AS count FROM checkins WHERE user_id=$1 AND client_event_id=$2`, [raceUser, eventId]);
+    const duplicateResults = await Promise.all(Array.from({length:20},()=>http('/api/checkins',{method:'POST',headers:{authorization:`Bearer ${tokenFor(raceUser)}`},body:JSON.stringify({siteId:created.siteId,lat:30.0444,lng:31.2357,accuracyMeters:5,deviceId:values[0].deviceId,type:'check_in',clientEventId:eventId})})));
+    const duplicateStatuses = duplicateResults.reduce((m,r)=>(m[r.status]=(m[r.status]||0)+1,m),{});
+    const duplicateRows = await db.query(`SELECT COUNT(*)::int AS count FROM checkins WHERE user_id=$1 AND client_event_id=$2`,[raceUser,eventId]);
     console.log(`Idempotency: statuses=${JSON.stringify(duplicateStatuses)} dbRows=${duplicateRows.rows[0].count}`);
-    if (Number(duplicateRows.rows[0].count) !== 1) throw new Error('IDEMPOTENCY FAILURE: duplicate event created multiple rows');
+    if (Number(duplicateRows.rows[0].count)!==1) throw new Error('IDEMPOTENCY FAILURE: duplicate event created multiple rows');
 
     const raceWorker = created.userIds[1];
-    const race = await Promise.all(Array.from({ length: 10 }, () => http('/api/checkins', {
-      method: 'POST', headers: { authorization: `Bearer ${tokenFor(raceWorker)}` },
-      body: JSON.stringify({ siteId: created.siteId, lat: 30.0444, lng: 31.2357, accuracyMeters: 5, deviceId: values[1].deviceId, type: 'check_in', clientEventId: randomUUID() })
-    })));
-    const raceStatuses = race.reduce((m, r) => { m[r.status] = (m[r.status] || 0) + 1; return m; }, {});
+    const race = await Promise.all(Array.from({length:10},()=>http('/api/checkins',{method:'POST',headers:{authorization:`Bearer ${tokenFor(raceWorker)}`},body:JSON.stringify({siteId:created.siteId,lat:30.0444,lng:31.2357,accuracyMeters:5,deviceId:values[1].deviceId,type:'check_in',clientEventId:randomUUID()})})));
+    const raceStatuses = race.reduce((m,r)=>(m[r.status]=(m[r.status]||0)+1,m),{});
     console.log(`State race (same worker, unique events): ${JSON.stringify(raceStatuses)}`);
-    if ((raceStatuses[201] || 0) !== 1 || (raceStatuses[409] || 0) !== 9) throw new Error('STATE RACE FAILURE: expected 1 successful check-in and 9 conflicts');
+    if ((raceStatuses[201]||0)!==1 || (raceStatuses[409]||0)!==9) throw new Error('STATE RACE FAILURE: expected 1 successful check-in and 9 conflicts');
 
     console.log('\n=== PASS: all stress assertions completed ===');
-    console.log(JSON.stringify({ levels: LEVELS, workers: WORKERS, results }, null, 2));
+    console.log(JSON.stringify({levels:LEVELS,workers:WORKERS,results},null,2));
   } finally {
     console.log('Cleaning synthetic stress data...');
     if (created.userIds.length) {
-      await db.query('DELETE FROM checkins WHERE user_id = ANY($1::int[])', [created.userIds]);
-      await db.query('DELETE FROM notifications WHERE user_id = ANY($1::int[]) OR body LIKE $2', [created.userIds, `${PREFIX}%`]);
-      await db.query('DELETE FROM assignments WHERE user_id = ANY($1::int[])', [created.userIds]);
-      await db.query('DELETE FROM worker_skills WHERE user_id = ANY($1::int[])', [created.userIds]);
-      await db.query('DELETE FROM users WHERE id = ANY($1::int[])', [created.userIds]);
+      await db.query('DELETE FROM checkins WHERE user_id = ANY($1::int[])',[created.userIds]);
+      await db.query('DELETE FROM notifications WHERE user_id = ANY($1::int[]) OR body LIKE $2',[created.userIds,`${PREFIX}%`]);
+      await db.query('DELETE FROM assignments WHERE user_id = ANY($1::int[])',[created.userIds]);
+      await db.query('DELETE FROM worker_skills WHERE user_id = ANY($1::int[])',[created.userIds]);
+      await db.query('DELETE FROM users WHERE id = ANY($1::int[])',[created.userIds]);
     }
-    if (created.siteId) await db.query('DELETE FROM sites WHERE id=$1', [created.siteId]);
-    await db.end();
-    console.log('Cleanup complete.');
+    if (created.siteId) await db.query('DELETE FROM sites WHERE id=$1',[created.siteId]);
+    await db.end(); console.log('Cleanup complete.');
   }
 }
-
-main().catch(error => {
-  console.error('\n=== STRESS TEST FAILED ===');
-  console.error(error.stack || error);
-  process.exit(1);
-});
+main().catch(error=>{console.error('\n=== STRESS TEST FAILED ===');console.error(error.stack||error);process.exit(1);});
