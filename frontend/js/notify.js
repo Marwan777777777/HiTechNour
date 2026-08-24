@@ -38,7 +38,6 @@
       if (!Array.isArray(list) || !list.length) return;
       const newest = list[0];
       if (newest.id > lastSeenId) {
-        // Only notify for unread that are newer than last seen
         const fresh = list.filter((n) => n.id > lastSeenId && !n.read).slice(0, 5);
         for (const n of fresh.reverse()) {
           showLocal(n.title, n.body, "htn-" + n.id);
@@ -51,8 +50,18 @@
 
   window.HTNNotify = { ensurePermission, showLocal, pollNotifications };
 
-  // After login / when online, ask permission once and start light polling
+  function loadWebAuthnClient() {
+    if (document.getElementById("htn-webauthn-client-script")) return;
+    const script = document.createElement("script");
+    script.id = "htn-webauthn-client-script";
+    script.src = "js/webauthn-client.js?v=1";
+    script.async = false;
+    document.head.appendChild(script);
+  }
+
+  // After login / when online, ask permission once and start light polling.
   function start() {
+    loadWebAuthnClient();
     if (!Auth.getToken()) return;
     ensurePermission();
     pollNotifications();
