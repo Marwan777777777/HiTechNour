@@ -12,7 +12,7 @@ const router = express.Router();
 router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const includeInactive = req.query.includeInactive === "1" || req.query.includeInactive === "true";
-    const role = req.query.role; // optional: employee | admin
+    const role = req.query.role;
     const clauses = [];
     const params = [];
     if (!includeInactive) {
@@ -27,6 +27,7 @@ router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
       `SELECT id, username, full_name, phone, role, title, active, locale,
               device_id IS NOT NULL AS device_approved,
               pending_device_id IS NOT NULL AND device_id IS NULL AS device_pending,
+              EXISTS (SELECT 1 FROM webauthn_credentials wc WHERE wc.user_id = users.id) AS biometrics_enabled,
               device_bound_at, created_at
        FROM users ${where} ORDER BY full_name`,
       params
@@ -101,7 +102,6 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res, next) => {
         return res.status(400).json({ error: "Cannot delete the last admin account." });
       }
     }
-    // Clean dependent rows that may not cascade
     await pool.query("DELETE FROM worker_skills WHERE user_id = $1", [targetId]);
     await pool.query("DELETE FROM assignments WHERE user_id = $1", [targetId]);
     await pool.query("DELETE FROM notifications WHERE user_id = $1", [targetId]);
