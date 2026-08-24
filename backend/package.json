@@ -12,6 +12,7 @@
     "test:concurrency": "node --test test/checkins.concurrency.test.js"
   },
   "dependencies": {
+    "@simplewebauthn/server": "^13.3.2",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
