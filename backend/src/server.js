@@ -11,6 +11,7 @@ const assignmentRoutes = require("./routes/assignments");
 const skillRoutes = require("./routes/skills");
 const reportRoutes = require("./routes/reports");
 const fieldRoutes = require("./routes/field");
+const webauthnRoutes = require("./routes/webauthn");
 
 const app = express();
 
@@ -55,6 +56,7 @@ app.use("/api/assignments", assignmentRoutes);
 app.use("/api/skills", skillRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/field", fieldRoutes);
+app.use("/api/webauthn", webauthnRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -74,8 +76,8 @@ const PORT = process.env.PORT || 4000;
 const { applyMigrations } = require("./migrate");
 
 // Applies any pending schema changes before accepting traffic, so a
-// deploy that adds new tables/columns just works - no separate manual
-// migration step needed on every push.
+// deploy that adds new tables/columns just works without a separate manual
+// migration step on every push.
 applyMigrations()
   .then(() => {
     app.listen(PORT, () => {
