@@ -36,87 +36,17 @@ const Auth = {
   },
 };
 
-const OfflineQueue = (() => {
-  const DB_NAME = "htn_offline";
-  const STORE = "queue";
-  const VERSION = 2;
-  let dbPromise = null;
-
-  function open() {
-    if (dbPromise) return dbPromise;
-    dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, VERSION);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(STORE)) {
-          db.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-    return dbPromise;
-  }
-
-  async function enqueue(item) {
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).add({
-        ...item,
-        ownerUserId: item.ownerUserId ?? Auth.getUser()?.id ?? null,
-        created: Date.now(),
-      });
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  }
-
-  async function list() {
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, "readonly");
-      const req = tx.objectStore(STORE).getAll();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  async function remove(id) {
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).delete(id);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  }
-
-  async function countForCurrentUser() {
-    const userId = Auth.getUser()?.id;
-    if (!userId) return 0;
-    const items = await list();
-    return items.filter((item) => item.ownerUserId === userId).length;
-  }
-
-  async function hasPendingCheckin(type) {
-    const userId = Auth.getUser()?.id;
-    if (!userId) return false;
-    const items = await list();
-    return items.some(
-      (item) => item.ownerUserId === userId && item.kind === "checkin" && item.payload?.type === type
-    );
-  }
-
-  return {
-    enqueue,
-    list,
-    remove,
-    count: countForCurrentUser,
-    countForCurrentUser,
-    hasPendingCheckin,
-  };
-})();
+// Offline attendance/report queuing has intentionally been removed.
+// Attendance and reports are sent directly to the server so the UI never
+// presents a misleading "ready to sync" state.
+function clearLegacyOfflineQueue() {
+  try {
+    const request = indexedDB.deleteDatabase("htn_offline");
+    request.onerror = () => {};
+    request.onblocked = () => {};
+  } catch (_) {}
+}
+clearLegacyOfflineQueue();
 
 async function apiRequest(path, { method = "GET", body, isBlob = false } = {}) {
   const headers = { "Content-Type": "application/json" };
@@ -218,81 +148,29 @@ const Api = {
   getActivity: () => apiRequest("/field/activity"),
 };
 
+// Compatibility wrappers kept so the existing app UI does not need a risky
+// rewrite. They now perform a normal online request and never queue anything.
 async function checkInWithOffline(payload) {
   const userId = Auth.getUser()?.id;
   if (!userId) throw new Error("Your session is missing. Please sign in again.");
-
-  const type = payload.type;
-  if (type !== "check_in" && type !== "check_out") throw new Error("Invalid attendance action.");
+  if (payload.type !== "check_in" && payload.type !== "check_out") {
+    throw new Error("Invalid attendance action.");
+  }
   if (!payload.clientEventId) payload.clientEventId = getClientEventId();
-
-  if (await OfflineQueue.hasPendingCheckin(type)) {
-    const error = new Error(type === "check_in" ? "A check-in is already waiting to sync." : "A check-out is already waiting to sync.");
-    error.code = "OFFLINE_EVENT_PENDING";
-    throw error;
-  }
-
-  if (!navigator.onLine) {
-    await OfflineQueue.enqueue({ kind: "checkin", ownerUserId: userId, payload });
-    return { offline: true, message: "Saved offline – will sync when online." };
-  }
-
-  try {
-    return await Api.checkIn(payload);
-  } catch (err) {
-    if (err.message.includes("Network error")) {
-      await OfflineQueue.enqueue({ kind: "checkin", ownerUserId: userId, payload });
-      return { offline: true, message: "Saved offline – will sync when online." };
-    }
-    throw err;
-  }
+  return Api.checkIn(payload);
 }
 
 async function submitReportWithOffline(payload) {
   const userId = Auth.getUser()?.id;
   if (!userId) throw new Error("Your session is missing. Please sign in again.");
-  if (!navigator.onLine) {
-    await OfflineQueue.enqueue({ kind: "report", ownerUserId: userId, payload });
-    return { offline: true, message: "Report saved offline – will sync when online." };
-  }
-  try {
-    return await Api.submitReport(payload);
-  } catch (err) {
-    if (err.message.includes("Network error")) {
-      await OfflineQueue.enqueue({ kind: "report", ownerUserId: userId, payload });
-      return { offline: true, message: "Report saved offline – will sync when online." };
-    }
-    throw err;
-  }
+  return Api.submitReport(payload);
 }
 
 async function flushOfflineQueue() {
-  const currentUserId = Auth.getUser()?.id;
-  if (!currentUserId || !navigator.onLine) return 0;
-
-  const items = await OfflineQueue.list();
-  let synced = 0;
-  for (const item of items) {
-    if (item.ownerUserId !== currentUserId) continue;
-
-    try {
-      if (item.kind === "checkin") await Api.checkIn(item.payload);
-      else if (item.kind === "report") await Api.submitReport(item.payload);
-      await OfflineQueue.remove(item.id);
-      synced++;
-    } catch (err) {
-      if (err.status >= 400 && err.status < 500 && err.status !== 429) {
-        await OfflineQueue.remove(item.id);
-      }
-    }
-  }
-  return synced;
+  return 0;
 }
 
-if (typeof window !== "undefined") {
-  window.addEventListener("online", () => {
-    flushOfflineQueue().then((n) => {
-      if (n > 0 && window.showToast) window.showToast(`${n} offline item(s) synced`, "success");
-    });
-  });
-}
+// Kept as a harmless compatibility object for older presentation code.
+const OfflineQueue = {
+  count: async () => 0,
+};
