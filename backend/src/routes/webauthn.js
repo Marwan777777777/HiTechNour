@@ -77,6 +77,22 @@ async function consumeChallenge(kind, userId) {
   return rows[0]?.challenge || null;
 }
 
+async function consumeAuthenticationChallenge(challenge) {
+  const { rows } = await pool.query(
+    `DELETE FROM webauthn_challenges
+     WHERE id = (
+       SELECT id FROM webauthn_challenges
+       WHERE kind = 'authentication' AND user_id IS NULL
+         AND challenge = $1 AND expires_at > now()
+       ORDER BY created_at DESC
+       LIMIT 1
+     )
+     RETURNING challenge`,
+    [challenge]
+  );
+  return rows[0]?.challenge || null;
+}
+
 // Password login remains the bootstrap. This endpoint is only available after
 // the worker has already authenticated with the normal session token.
 router.get("/status", requireAuth, async (req, res, next) => {
@@ -92,7 +108,6 @@ router.get("/status", requireAuth, async (req, res, next) => {
   }
 });
 
-// Start biometric/passkey enrollment for the currently authenticated worker.
 router.get("/registration-options", requireAuth, async (req, res, next) => {
   try {
     const { rows: users } = await pool.query(
@@ -202,6 +217,16 @@ router.post("/authentication-verify", async (req, res, next) => {
     const credentialId = body.id || body.rawId;
     if (!credentialId) return res.status(400).json({ error: "Missing biometric credential." });
 
+    let clientData;
+    try {
+      clientData = JSON.parse(base64UrlToBuffer(body.response?.clientDataJSON).toString("utf8"));
+    } catch {
+      return res.status(400).json({ error: "Invalid biometric response." });
+    }
+    if (!clientData?.challenge) {
+      return res.status(400).json({ error: "Missing biometric challenge." });
+    }
+
     const { rows: credentials } = await pool.query(
       `SELECT c.id, c.user_id, c.credential_id, c.public_key, c.counter, c.transports,
               u.username, u.full_name, u.role, u.token_version, u.active
@@ -216,7 +241,7 @@ router.post("/authentication-verify", async (req, res, next) => {
       return res.status(401).json({ error: "This biometric sign-in is no longer available." });
     }
 
-    const expectedChallenge = await consumeChallenge("authentication", null);
+    const expectedChallenge = await consumeAuthenticationChallenge(clientData.challenge);
     if (!expectedChallenge) return res.status(400).json({ error: "Biometric sign-in expired. Try again." });
 
     const verification = await verifyAuthenticationResponse({
@@ -265,8 +290,6 @@ router.post("/authentication-verify", async (req, res, next) => {
   }
 });
 
-// Worker can remove their own registered biometric/passkey. Password login
-// remains available and can be used to register a new one later.
 router.delete("/credentials", requireAuth, async (req, res, next) => {
   try {
     const result = await pool.query("DELETE FROM webauthn_credentials WHERE user_id = $1", [req.user.id]);
