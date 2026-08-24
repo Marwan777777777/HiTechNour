@@ -19,6 +19,40 @@ async function applyMigrations() {
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS locale TEXT NOT NULL DEFAULT 'en'"
   );
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS webauthn_credentials (
+      id              SERIAL PRIMARY KEY,
+      user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      credential_id   TEXT NOT NULL UNIQUE,
+      public_key      BYTEA NOT NULL,
+      counter         BIGINT NOT NULL DEFAULT 0,
+      transports      TEXT,
+      device_type     TEXT,
+      backed_up       BOOLEAN NOT NULL DEFAULT false,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_used_at    TIMESTAMPTZ
+    )
+  `);
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_user ON webauthn_credentials (user_id)"
+  );
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS webauthn_challenges (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      kind        TEXT NOT NULL CHECK (kind IN ('registration', 'authentication')),
+      challenge   TEXT NOT NULL,
+      expires_at  TIMESTAMPTZ NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_lookup ON webauthn_challenges (kind, user_id, created_at DESC)"
+  );
+  await pool.query("DELETE FROM webauthn_challenges WHERE expires_at < now()");
+  console.log("[migrate] Ensured WebAuthn credential/challenge tables.");
+
   // Existing deployments may already have checkins rows created before
   // idempotency was introduced. Give those historical rows deterministic IDs,
   // then enforce the invariant for all future rows.
