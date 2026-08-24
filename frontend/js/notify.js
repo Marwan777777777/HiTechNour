@@ -28,7 +28,6 @@
     } catch (_) {}
   }
 
-  // Poll in-app notifications and surface new ones as OS notifications
   let lastSeenId = Number(localStorage.getItem("htn_last_notif_id") || 0);
 
   async function pollNotifications() {
@@ -54,14 +53,17 @@
     if (document.getElementById("htn-webauthn-client-script")) return;
     const script = document.createElement("script");
     script.id = "htn-webauthn-client-script";
-    script.src = "js/webauthn-client.js?v=1";
+    script.src = "js/webauthn-client.js?v=2";
     script.async = false;
     document.head.appendChild(script);
   }
 
-  // After login / when online, ask permission once and start light polling.
+  // Load WebAuthn immediately after api.js has been loaded. This keeps the
+  // existing password login handler in app.js intact while allowing the
+  // biometric wrapper to be installed before a user can submit the form.
+  loadWebAuthnClient();
+
   function start() {
-    loadWebAuthnClient();
     if (!Auth.getToken()) return;
     ensurePermission();
     pollNotifications();
