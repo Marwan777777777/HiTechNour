@@ -222,3 +222,13 @@ html[dir="rtl"] #app-screen .worker-tabs{direction:rtl;}
   #login-screen .login-shell{height:auto!important;min-height:0!important;}
   #login-screen .login-visual,#login-screen .login-panel{height:auto!important;min-height:0!important;}
 }
+
+/* CRITICAL FIX: login-refinement.css sets #login-screen{display:flex!important}
+   unconditionally (ID selector). A plain .hidden{display:none!important} class
+   can never out-rank an ID selector regardless of !important, so the login
+   screen was never actually hiding after a successful login — it just used to
+   be clipped out of view by the old overflow:hidden. Now that scrolling works,
+   it was visible below the worker app. This rule uses #login-screen.hidden
+   (ID + class combined) which has higher specificity than the plain ID rule,
+   so it reliably wins and actually hides the screen. */
+#login-screen.hidden{display:none!important;}
