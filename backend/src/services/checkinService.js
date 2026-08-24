@@ -62,6 +62,42 @@ async function processCheckin(pool, userId, payload) {
     }
   }
 
+  // Device registration is a separate state transition from attendance.
+  // It must be persisted before returning the pending-approval response.
+  // Previously this UPDATE happened inside the attendance transaction and
+  // was rolled back when the pending error was thrown, which meant workers
+  // were told to ask an admin for approval but admins could never see the
+  // pending device.
+  const deviceResult = await pool.query(
+    `SELECT id, device_id, pending_device_id, full_name, username
+     FROM users WHERE id = $1`,
+    [userId]
+  );
+  const currentUser = deviceResult.rows[0];
+  if (!currentUser) {
+    const error = new Error("User not found.");
+    error.status = 401;
+    throw error;
+  }
+
+  if (!currentUser.device_id) {
+    if (!currentUser.pending_device_id) {
+      await pool.query(
+        `UPDATE users
+         SET pending_device_id = $1
+         WHERE id = $2 AND device_id IS NULL AND pending_device_id IS NULL`,
+        [deviceId, currentUser.id]
+      );
+    }
+
+    const error = new Error(
+      "This device is awaiting admin approval before it can be used for check-ins. Ask your admin to approve it."
+    );
+    error.status = 403;
+    error.pending = true;
+    throw error;
+  }
+
   const client = await pool.connect();
   let committed = false;
   try {
@@ -110,17 +146,7 @@ async function processCheckin(pool, userId, payload) {
     }
 
     let deviceMatched = true;
-    if (!user.device_id) {
-      if (!user.pending_device_id) {
-        await client.query("UPDATE users SET pending_device_id = $1 WHERE id = $2", [deviceId, user.id]);
-      }
-      const error = new Error(
-        "This device is awaiting admin approval before it can be used for check-ins. Ask your admin to approve it."
-      );
-      error.status = 403;
-      error.pending = true;
-      throw error;
-    } else if (user.device_id !== deviceId) {
+    if (user.device_id !== deviceId) {
       deviceMatched = false;
       if (BLOCK_ON_DEVICE_MISMATCH) {
         const error = new Error(
